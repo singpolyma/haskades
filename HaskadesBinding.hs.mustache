@@ -1,0 +1,54 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
+module HaskadesBinding (haskadesRun, emit) where
+
+import Foreign.C.Types
+import Foreign.C.String
+import Foreign.Ptr
+import System.Exit (exitWith, ExitCode(ExitFailure))
+import Control.Monad (when, ap, join)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import qualified Data.Text.Lazy as LText
+import qualified Data.Text.Lazy.Encoding as LText
+import qualified Data.ByteString as ByteString
+
+import {{modul}}
+
+foreign import ccall safe "haskades_run.cpp haskades_run"
+	c_haskades_run ::
+	CString -> {{#slots}}FunPtr ({{#args}}{{ctype}} -> {{/args}} {{crtype}}) -> {{/slots}}
+	IO CInt
+
+foreign import ccall unsafe "start.cpp emit_CustomSignalEvent"
+	c_emit_CustomSignalEvent ::
+	CInt -> {{#signalTypes}}{{csigtype}} -> {{/signalTypes}}
+	IO ()
+
+emit :: Signal -> IO ()
+{{#signals}}
+emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) =
+	({{sigcwrap}})
+	(c_emit_CustomSignalEvent {{sigevent}})
+{{/signals}}
+
+-- Function pointer wrappers
+{{#slots}}
+foreign import ccall "wrapper" wrap_{{name}} :: ({{#args}}{{ctype}} -> {{/args}} {{crtype}}) -> IO (FunPtr ({{#args}}{{ctype}} -> {{/args}} {{crtype}}))
+{{/slots}}
+
+haskadesRun :: String -> Slots -> IO ()
+haskadesRun qmlPath (Slots {{#slots}}{{name}} {{/slots}}) = do
+{{#slots}}
+	{{name}}Ptr <- wrap_{{name}} (\{{#args}}{{aname}} {{/args}}-> (join ((return {{monadic}}) {{#args}} `ap` {{cwrap}}{{/args}})) >>= {{crwrap}})
+{{/slots}}
+
+	code <- ByteString.useAsCString (Text.encodeUtf8 $ Text.pack qmlPath) (\qmlPath ->
+			c_haskades_run qmlPath {{#slots}}{{name}}Ptr {{/slots}}
+		)
+
+{{#slots}}
+	freeHaskellFunPtr {{name}}Ptr
+{{/slots}}
+
+	when (code /= 0) (exitWith $ ExitFailure $ fromIntegral code)
+	return ()
