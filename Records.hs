@@ -19,13 +19,21 @@ data Slot = Slot {
 } deriving (Show)
 
 data SlotArg = SlotArg {
+	firstarg :: Bool,
 	aname :: String,
 	ctype :: String,
-	cwrap :: String
+	lowctype :: String,
+	qttype :: String,
+	cwrap :: String,
+	qtunwrap :: String
 } deriving (Show)
 
 data SignalType = SignalType {
-	csigtype :: String
+	csigtype :: String,
+	qtsigtype :: String,
+	qtwrapsig :: String,
+	lowcsigtype :: String,
+	sigtypename :: String
 } deriving (Show)
 
 data Signal = Signal {
@@ -36,5 +44,8 @@ data Signal = Signal {
 } deriving (Show)
 
 data SignalArg = SignalArg {
-	siganame :: String
+	sigargfirst :: Bool,
+	siganame :: String,
+	qtsigargtype :: String,
+	sigargsigtypename :: String
 } deriving (Show)

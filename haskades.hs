@@ -4,6 +4,8 @@ import Data.List
 import Control.Error
 import Control.Arrow
 import Control.Applicative
+import System.IO
+import System.Environment (getArgs)
 import Language.Haskell.Parser
 import Language.Haskell.Syntax
 import Blaze.ByteString.Builder (toByteStringIO)
@@ -79,6 +81,22 @@ getSignals i decls = signalDecl >>= signalsFrom >>= mapM signalConstr
 	signalDecl = note "No sum type named \"Signal\" found." $
 		find (dataDeclNamed (HsIdent "Signal")) decls
 
+mapQtType :: Type -> String
+mapQtType TInt = "int"
+mapQtType TDouble = "double"
+mapQtType TUnit = "const void *"
+mapQtType TString = "QString"
+mapQtType TText = "QString"
+mapQtType TLText = "QString"
+
+mapLowCType :: Type -> String
+mapLowCType TInt = "int"
+mapLowCType TDouble = "double"
+mapLowCType TUnit = "const void *"
+mapLowCType TString = "const char *"
+mapLowCType TText = "const char *"
+mapLowCType TLText = "const char *"
+
 mapCType :: Type -> String
 mapCType TInt = "CInt"
 mapCType TDouble = "CDouble"
@@ -107,6 +125,18 @@ wrapTypeToC TString arg = "(ByteString.useAsCString (Text.encodeUtf8 $ Text.pack
 wrapTypeToC TText arg = "(ByteString.useAsCString (Text.encodeUtf8 " ++ arg ++ "))"
 wrapTypeToC TLText arg = "(ByteString.useAsCString (Text.encodeUtf8 $ LText.toStrict " ++ arg ++ "))"
 
+wrapTypeFromQt :: Type -> String -> String
+wrapTypeFromQt TString arg = "(" ++ arg ++ ").toUtf8().constData()"
+wrapTypeFromQt TText arg = "(" ++ arg ++ ").toUtf8().constData()"
+wrapTypeFromQt TLText arg = "(" ++ arg ++ ").toUtf8().constData()"
+wrapTypeFromQt _ arg = "(" ++ arg ++ ")"
+
+wrapTypeToQt :: Type -> String -> String
+wrapTypeToQt TString arg = "(QString::fromUtf8(" ++ arg ++ "))"
+wrapTypeToQt TText arg = "(QString::fromUtf8(" ++ arg ++ "))"
+wrapTypeToQt TLText arg = "(QString::fromUtf8(" ++ arg ++ "))"
+wrapTypeToQt _ arg = "(" ++ arg ++ ")"
+
 defTypeToC :: Type -> String
 defTypeToC TInt = "(flip ($) 0)"
 defTypeToC TDouble = "(flip ($) 0)"
@@ -121,47 +151,78 @@ templateSlot (fname, args, rtype) = Slot {
 			RPure _ -> "(return " ++ fname ++ ")"
 			RIO _ -> "(" ++ fname ++ ")",
 		args = zipWith (\i a -> SlotArg {
+				firstarg = i == 0,
 				aname = "arg" ++ show i,
 				ctype = mapCType a,
-				cwrap = wrapTypeFromC a ("arg" ++ show i)
+				lowctype = mapLowCType a,
+				qttype = mapQtType a,
+				cwrap = wrapTypeFromC a ("arg" ++ show i),
+				qtunwrap = wrapTypeFromQt a ("arg" ++ show i)
 			}) [0..] args,
 		crtype = mapCRType rtype,
 		crwrap = "(return)" -- TODO
 	}
 
-sigCWrap' :: [Type] -> [(Int, Type)] -> [String]
-sigCWrap' [] _ = []
-sigCWrap' (e:es) ts
+sigCWrap' :: [(Int, Type)] -> [(Int, Type)] -> ([(Int, Int)], [String])
+sigCWrap' [] _ = ([], [])
+sigCWrap' ((ei,e):es) ts
 	| null sameType = -- No more of this type in this signal
-		("(.) " ++ defTypeToC e) : sigCWrap' es ts
+		second (("(.) " ++ defTypeToC e) :) (sigCWrap' es ts)
 	| otherwise = -- Use up one of this type
-		("(.) " ++ wrapTypeToC e ("arg" ++ show i)) : sigCWrap' es (tail sameType ++ rest)
+		let (idxs, r) = sigCWrap' es (tail sameType ++ rest) in
+		((i, ei) : idxs, ("(.) " ++ wrapTypeToC e ("arg" ++ show i)) : r)
 	where
 	(i, _) = head sameType
 	(sameType, rest) = partition ((==e).snd) ts
 
-sigCWrap :: [Type] -> [(Int, Type)] -> String
-sigCWrap es ts = case wraps of
+sigCWrap :: [Type] -> [(Int, Type)] -> ([(Int, Int)], String)
+sigCWrap es ts = (,) idxs $ case wraps of
 		[] -> ""
-		[x] -> x
+		[x] -> drop 4 x
 		(x:xs) -> intercalate " $ (.) $ " (reverse xs) ++ " $ " ++ x
 	where
-	wraps = reverse $ sigCWrap' es ts
+	(idxs, wraps) = second reverse $ sigCWrap' (zip [0..] es) ts
 
 templateSignal :: [Type] -> Integer -> (String, [Type]) -> Signal
 templateSignal signalTypes i (name, ts) = Signal {
 	signame = name,
-	sigargs = zipWith (\i _ -> SignalArg $ "arg" ++ show i) [0..] ts,
+	sigargs = zipWith (\i t -> SignalArg {
+			sigargfirst = i == 0,
+			siganame = "arg" ++ show i,
+			qtsigargtype = mapQtType t,
+			sigargsigtypename = let Just x = lookup i idxs in "arg" ++ show x
+		}) [0..] ts,
 	sigevent = i,
-	sigcwrap = sigCWrap signalTypes $ zip [0..] ts
+	sigcwrap = cwrap
 }
+	where
+	(idxs, cwrap) = sigCWrap signalTypes $ zip [0..] ts
 
 main = runScript $ do
-	(mod, importEnv, decls) <- fmap doParse (scriptIO $ readFile "./Types.hs")
+	(mod, importEnv, decls) <- fmap doParse (scriptIO $ getContents)
 	slots <- hoistEither $ getSlots importEnv decls
 	signals <- hoistEither $ getSignals importEnv decls
 	let signalTypes = concatMap (\(t,c) -> replicate c t) $ M.toAscList $
 		M.unionsWith (+) $ map (M.fromListWith (+) . (`zip` [1,1..]) . snd) signals
 	let sigs = zipWith (templateSignal signalTypes) [1..] signals
-	scriptIO $ toByteStringIO BS.putStr $ haskadesBindinghs id $ Template mod (map templateSlot slots) (map (SignalType . mapCType) signalTypes) sigs
-	--scriptIO $ print $ Template mod (map templateSlot slots) (map (SignalType . mapCType) signalTypes)
+	let sigTypes = zipWith (\i t -> SignalType {
+			csigtype = mapCType t,
+			qtsigtype = mapQtType t,
+			qtwrapsig = wrapTypeToQt t ("arg" ++ show i),
+			lowcsigtype = mapLowCType t,
+			sigtypename = "arg" ++ show i
+		}) [0..] signalTypes
+	let template = Template {
+			modul = mod,
+			slots = (map templateSlot slots),
+			signalTypes = sigTypes,
+			signals = sigs
+		}
+
+	[hsout, cppout] <- scriptIO getArgs
+	scriptIO $ withFile hsout WriteMode (\hsfile ->
+			toByteStringIO (BS.hPutStr hsfile) $ haskadesBindinghs id $ template
+		)
+	scriptIO $ withFile cppout WriteMode (\cppfile ->
+			toByteStringIO (BS.hPutStr cppfile) $ haskades_runcpp id $ template
+		)
