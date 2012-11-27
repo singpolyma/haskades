@@ -43,8 +43,8 @@ public:
 		if(!qml->hasErrors()) {
 			qml->setContextProperty("app", this);
 
-			// Create the application Page from QMLDocument.
-			bb::cascades::Page *appPage = qml->createRootObject<bb::cascades::Page>();
+			// Create the application root from QMLDocument
+			bb::cascades::AbstractPane *appPage = qml->createRootObject<bb::cascades::AbstractPane>();
 
 			if (appPage) {
 				// Set the main scene for the application to the Page.
