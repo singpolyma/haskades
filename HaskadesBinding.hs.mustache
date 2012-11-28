@@ -39,7 +39,7 @@ foreign import ccall "wrapper" wrap_{{name}} :: ({{#args}}{{ctype}} -> {{/args}}
 haskadesRun :: String -> Slots -> IO ()
 haskadesRun qmlPath (Slots {{#slots}}{{name}} {{/slots}}) = do
 {{#slots}}
-	{{name}}Ptr <- wrap_{{name}} (\{{#args}}{{aname}} {{/args}}-> (join ((return {{monadic}}) {{#args}} `ap` {{cwrap}}{{/args}})) >>= {{crwrap}})
+	{{name}}Ptr <- wrap_{{name}} ({{#hasArgs}}\{{/hasArgs}}{{#args}}{{aname}} {{/args}}{{#hasArgs}}-> {{/hasArgs}}(join ((return {{monadic}}) {{#args}} `ap` {{cwrap}}{{/args}})) >>= {{crwrap}})
 {{/slots}}
 
 	code <- ByteString.useAsCString (Text.encodeUtf8 $ Text.pack qmlPath) (\qmlPath ->

@@ -62,7 +62,7 @@ getSlots i decls = slotsDecl >>= slotsFrom >>= mapM slotField
 	slotField ([HsIdent fname], t) = case extractTypeFromBangType t of
 		(HsTyFun a b) -> let (args, r) = flatTyFun a b in
 			(,,) <$> pure fname <*> mapM (resolveType i) args <*> resolveRType i r
-		_ -> Left $ "Non-function slots are not supported yet: " ++ show t
+		x -> (,,) <$> pure fname <*> pure [] <*> resolveRType i x
 	slotField (x, _) = Left $ "Expected field name, found: " ++ show x
 	slotsFrom (HsDataDecl _ _ _ _ [HsRecDecl _ (HsIdent "Slots") fields] _) = Right fields
 	slotsFrom _ = Left "Type \"Slots\" must have a single record constructor named \"Slots\"."
@@ -150,6 +150,7 @@ templateSlot (fname, args, rtype) = Slot {
 		monadic = case rtype of
 			RPure _ -> "(return " ++ fname ++ ")"
 			RIO _ -> "(" ++ fname ++ ")",
+		hasArgs = not (null args),
 		args = zipWith (\i a -> SlotArg {
 				firstarg = i == 0,
 				aname = "arg" ++ show i,

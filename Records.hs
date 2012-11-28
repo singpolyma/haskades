@@ -14,6 +14,7 @@ data Slot = Slot {
 	name :: String,
 	monadic :: String,
 	args :: [SlotArg],
+	hasArgs :: Bool,
 	crtype :: String,
 	crwrap :: String
 } deriving (Show)
