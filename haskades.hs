@@ -203,7 +203,7 @@ main = runScript $ do
 	slots <- hoistEither $ getSlots importEnv decls
 	signals <- hoistEither $ getSignals importEnv decls
 	let signalTypes = concatMap (\(t,c) -> replicate c t) $ M.toAscList $
-		M.unionsWith (+) $ map (M.fromListWith (+) . (`zip` [1,1..]) . snd) signals
+		M.unionsWith max $ map (M.fromListWith (+) . (`zip` [1,1..]) . snd) signals
 	let sigs = zipWith (templateSignal signalTypes) [1..] signals
 	let sigTypes = zipWith (\i t -> SignalType {
 			csigtype = mapCType t,
