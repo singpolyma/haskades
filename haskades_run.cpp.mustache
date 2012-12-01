@@ -31,13 +31,14 @@ Q_OBJECT
 
 public:
 	// This is our constructor that sets up the recipe.
-	AppWrapper(QString qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstarg}}, {{/firstarg}}{{lowctype}} {{aname}}{{/args}}){{/slots}}) {
-{{#slots}}
-		this->_{{name}} = _{{name}};
-{{/slots}}
+	AppWrapper(QString qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstarg}}, {{/firstarg}}{{lowctype}} {{aname}}{{/args}}){{/slots}}) :
+	qmlPath(qml_path){{#slots}},
+	_{{name}}(_{{name}}){{/slots}}
+	{ }
 
+	virtual void ready() {
 		// Obtain a QMLDocument and load it into the qml variable, using build patterns.
-		bb::cascades::QmlDocument *qml = bb::cascades::QmlDocument::create(qml_path);
+		bb::cascades::QmlDocument *qml = bb::cascades::QmlDocument::create(this->qmlPath);
 
 		// If the QML document is valid, we process it.
 		if(!qml->hasErrors()) {
@@ -85,6 +86,7 @@ signals:
 {{/signals}}
 
 protected:
+	QString qmlPath;
 {{#slots}}
 	void (*_{{name}})({{#args}}{{^firstarg}}, {{/firstarg}}{{lowctype}} {{aname}}{{/args}});
 {{/slots}}
@@ -118,6 +120,7 @@ int haskades_run(char *qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstar
 	// Initialize our application.
 	AppWrapper mainApp(QString::fromUtf8(qml_path){{#slots}}, _{{name}}{{/slots}});
 	mainAppGlobal = (QObject*)&mainApp;
+	mainApp.ready();
 
 	// We complete the transaction started in the main application constructor and start the
 	// client event loop here. When loop is exited the Application deletes the scene which
