@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import Data.List
 import Control.Error
@@ -18,15 +18,18 @@ import MustacheTemplates
 data Type = TInt | TUTCTime | TDouble | TString | TText | TLText | TUnit deriving (Show, Ord, Eq)
 data RType = RPure Type | RIO Type deriving (Show, Eq)
 
+importPrefix :: HsImportDecl -> String
 importPrefix (HsImportDecl {importQualified = True, importAs = Just (Module m)}) = m
 importPrefix (HsImportDecl {importQualified = True, importAs = Nothing, importModule = (Module m)}) = m
 importPrefix _ = ""
 
+doParse :: String -> (String, [(String, Module)], [HsDecl])
 doParse moduleSrc = (mod, importEnv, decls)
 	where
-	importEnv = map (\i -> (importPrefix i, importModule i)) imports
+	importEnv = map (importPrefix &&& importModule) imports
 	ParseOk (HsModule _ (Module mod) _ imports decls) = parseModule moduleSrc
 
+dataDeclNamed :: HsName -> HsDecl -> Bool
 dataDeclNamed n (HsDataDecl _ _ name _ _ _) | n == name = True
 dataDeclNamed _ _ = False
 
@@ -46,11 +49,13 @@ findType i (Module m) q =
 	moduls = map fst q
 	ns = map snd $ filter ((==m).fst) i
 
+findTextType :: [(String, Module)] -> Module -> Either String Type
 findTextType i m = findType i m [
 		(Module "Data.Text", TText),
 		(Module "Data.Text.Lazy", TLText)
 	]
 
+findUTCTimeType :: [(String, Module)] -> Module -> Either String Type
 findUTCTimeType i m = findType i m [
 		(Module "Data.Time", TUTCTime),
 		(Module "Data.Time.Clock", TUTCTime)
@@ -71,6 +76,7 @@ resolveRType :: [(String, Module)] -> HsType -> Either String RType
 resolveRType i (HsTyApp (HsTyCon (UnQual (HsIdent "IO"))) t) = RIO <$> resolveType i t
 resolveRType i t = RPure <$> resolveType i t
 
+getSlots :: [(String, Module)] -> [HsDecl] -> Either String [(String, [Type], RType)]
 getSlots i decls = slotsDecl >>= slotsFrom >>= mapM slotField
 	where
 	slotField ([HsIdent fname], t) = case extractTypeFromBangType t of
@@ -88,10 +94,12 @@ flattenSum (HsConDecl _ (HsIdent n) ts) = Right (n, map extractTypeFromBangType 
 flattenSum (HsRecDecl _ (HsIdent n) ts) = Right (n, map (extractTypeFromBangType.snd) ts)
 flattenSum x = Left $ "Cannot process sum type constructor: " ++ show x
 
+getSignals :: [(String, Module)] -> [HsDecl] -> Either String [(String, [Type])]
 getSignals i decls = signalDecl >>= signalsFrom >>= mapM signalConstr
 	where
-	signalConstr (n, ts) = (,) <$> pure n <*> (mapM (resolveType i) ts)
+	signalConstr (n, ts) = (,) <$> pure n <*> mapM (resolveType i) ts
 	signalsFrom (HsDataDecl _ _ _ _ cons _) = mapM flattenSum cons
+	signalsFrom x = Left $ "Could not process signal near: " ++ show x
 	signalDecl = note "No sum type named \"Signal\" found." $
 		find (dataDeclNamed (HsIdent "Signal")) decls
 
@@ -143,6 +151,7 @@ wrapTypeToC TDouble arg = "(flip ($) (realToFrac " ++ arg ++ "))"
 wrapTypeToC TString arg = "(ByteString.useAsCString (Text.encodeUtf8 $ Text.pack " ++ arg ++ "))"
 wrapTypeToC TText arg = "(ByteString.useAsCString (Text.encodeUtf8 " ++ arg ++ "))"
 wrapTypeToC TLText arg = "(ByteString.useAsCString (Text.encodeUtf8 $ LText.toStrict " ++ arg ++ "))"
+wrapTypeToC TUnit arg = "(flip ($) (" ++ arg ++ "))"
 
 wrapTypeFromQt :: Type -> String -> String
 wrapTypeFromQt TUTCTime arg = "(" ++ arg ++ ").toTime_t()"
@@ -165,6 +174,7 @@ defTypeToC TDouble = "(flip ($) 0)"
 defTypeToC TString = "(flip ($) nullPtr)"
 defTypeToC TText = "(flip ($) nullPtr)"
 defTypeToC TLText = "(flip ($) nullPtr)"
+defTypeToC TUnit = "(flip ($) nullPtr)"
 
 templateSlot :: (String, [Type], RType) -> Slot
 templateSlot (fname, args, rtype) = Slot {
@@ -181,7 +191,7 @@ templateSlot (fname, args, rtype) = Slot {
 				qttype = mapQtType a,
 				cwrap = wrapTypeFromC a ("arg" ++ show i),
 				qtunwrap = wrapTypeFromQt a ("arg" ++ show i)
-			}) [0..] args,
+			}) [(0::Int)..] args,
 		crtype = mapCRType rtype,
 		crwrap = "(return)" -- TODO
 	}
@@ -221,8 +231,9 @@ templateSignal signalTypes i (name, ts) = Signal {
 	where
 	(idxs, cwrap) = sigCWrap signalTypes $ zip [0..] ts
 
+main :: IO ()
 main = runScript $ do
-	(mod, importEnv, decls) <- fmap doParse (scriptIO $ getContents)
+	(mod, importEnv, decls) <- fmap doParse (scriptIO getContents)
 	slots <- hoistEither $ getSlots importEnv decls
 	signals <- hoistEither $ getSignals importEnv decls
 	let signalTypes = concatMap (\(t,c) -> replicate c t) $ M.toAscList $
@@ -234,18 +245,18 @@ main = runScript $ do
 			qtwrapsig = wrapTypeToQt t ("arg" ++ show i),
 			lowcsigtype = mapLowCType t,
 			sigtypename = "arg" ++ show i
-		}) [0..] signalTypes
+		}) [(0::Int)..] signalTypes
 	let template = Template {
 			modul = mod,
-			slots = (map templateSlot slots),
+			slots = map templateSlot slots,
 			signalTypes = sigTypes,
 			signals = sigs
 		}
 
 	[hsout, cppout] <- scriptIO getArgs
 	scriptIO $ withFile hsout WriteMode (\hsfile ->
-			toByteStringIO (BS.hPutStr hsfile) $ haskadesBindinghs id $ template
+			toByteStringIO (BS.hPutStr hsfile) $ haskadesBindinghs id template
 		)
 	scriptIO $ withFile cppout WriteMode (\cppfile ->
-			toByteStringIO (BS.hPutStr cppfile) $ haskades_runcpp id $ template
+			toByteStringIO (BS.hPutStr cppfile) $ haskades_runcpp id template
 		)

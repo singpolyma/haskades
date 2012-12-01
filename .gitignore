@@ -2,3 +2,6 @@
 *.hi
 MustacheTemplates.hs
 haskades
+dist/
+dist-ghc/
+report.html
