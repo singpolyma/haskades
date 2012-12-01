@@ -7,6 +7,7 @@ import Foreign.C.String
 import Foreign.Ptr
 import System.Exit (exitWith, ExitCode(ExitFailure))
 import Control.Monad (when, ap, join)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Lazy as LText
@@ -25,11 +26,12 @@ foreign import ccall unsafe "start.cpp emit_CustomSignalEvent"
 	CInt -> {{#signalTypes}}{{csigtype}} -> {{/signalTypes}}
 	IO ()
 
-emit :: Signal -> IO ()
+emit :: (MonadIO m) => Signal -> m ()
 {{#signals}}
-emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) =
-	({{sigcwrap}})
-	(c_emit_CustomSignalEvent {{sigevent}})
+emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) = liftIO (
+		({{sigcwrap}})
+		(c_emit_CustomSignalEvent {{sigevent}})
+	)
 {{/signals}}
 
 -- Function pointer wrappers
@@ -37,8 +39,8 @@ emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) =
 foreign import ccall "wrapper" wrap_{{name}} :: ({{#args}}{{ctype}} -> {{/args}} {{crtype}}) -> IO (FunPtr ({{#args}}{{ctype}} -> {{/args}} {{crtype}}))
 {{/slots}}
 
-haskadesRun :: String -> Slots -> IO ()
-haskadesRun qmlPath (Slots {{#slots}}{{name}} {{/slots}}) = do
+haskadesRun :: (MonadIO m) => String -> Slots -> m ()
+haskadesRun qmlPath (Slots {{#slots}}{{name}} {{/slots}}) = liftIO $ do
 {{#slots}}
 	{{name}}Ptr <- wrap_{{name}} ({{#hasArgs}}\{{/hasArgs}}{{#args}}{{aname}} {{/args}}{{#hasArgs}}-> {{/hasArgs}}(join ((return {{monadic}}) {{#args}} `ap` {{cwrap}}{{/args}})) >>= {{crwrap}})
 {{/slots}}
