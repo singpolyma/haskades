@@ -15,6 +15,9 @@ import qualified Data.Map as M
 import Records
 import MustacheTemplates
 
+data Type = TInt | TUTCTime | TDouble | TString | TText | TLText | TUnit deriving (Show, Ord, Eq)
+data RType = RPure Type | RIO Type deriving (Show, Eq)
+
 importPrefix (HsImportDecl {importQualified = True, importAs = Just (Module m)}) = m
 importPrefix (HsImportDecl {importQualified = True, importAs = Nothing, importModule = (Module m)}) = m
 importPrefix _ = ""
@@ -35,14 +38,23 @@ flatTyFun :: HsType -> HsType -> ([HsType], HsType)
 flatTyFun a (HsTyFun b c) = first (a:) (flatTyFun b c)
 flatTyFun a b = ([a], b)
 
-findTextType i (Module m) =
-	case (findInNS "Data.Text", findInNS "Data.Text.Lazy") of
-		(Just _, _) -> Right TText
-		(_, Just _) -> Right TLText
-		_           -> Left "No Text import found, but Text used as type."
+findType :: [(String, Module)] -> Module -> [(Module, Type)] -> Either String Type
+findType i (Module m) q =
+	headErr ("No " ++ show q ++ " imports find, but one used as type.") matches
 	where
-	findInNS s = find ((==Module s).snd) ns
-	ns = filter ((==m).fst) i
+	matches = mapMaybe (`lookup` q) $ filter (`elem` moduls) ns
+	moduls = map fst q
+	ns = map snd $ filter ((==m).fst) i
+
+findTextType i m = findType i m [
+		(Module "Data.Text", TText),
+		(Module "Data.Text.Lazy", TLText)
+	]
+
+findUTCTimeType i m = findType i m [
+		(Module "Data.Time", TUTCTime),
+		(Module "Data.Time.Clock", TUTCTime)
+	]
 
 resolveType :: [(String, Module)] -> HsType -> Either String Type
 resolveType _ (HsTyCon (Special HsUnitCon)) = Right TUnit
@@ -51,6 +63,8 @@ resolveType _ (HsTyCon (UnQual (HsIdent "Double"))) = Right TDouble
 resolveType _ (HsTyCon (UnQual (HsIdent "String"))) = Right TString
 resolveType i (HsTyCon (UnQual (HsIdent "Text"))) = findTextType i (Module "")
 resolveType i (HsTyCon (Qual m (HsIdent "Text"))) = findTextType i m
+resolveType i (HsTyCon (UnQual (HsIdent "UTCTime"))) = findUTCTimeType i (Module "")
+resolveType i (HsTyCon (Qual m (HsIdent "UTCTime"))) = findUTCTimeType i m
 resolveType _ t = Left $ "Type not yet supported: " ++ show t
 
 resolveRType :: [(String, Module)] -> HsType -> Either String RType
@@ -83,6 +97,7 @@ getSignals i decls = signalDecl >>= signalsFrom >>= mapM signalConstr
 
 mapQtType :: Type -> String
 mapQtType TInt = "int"
+mapQtType TUTCTime = "QDateTime"
 mapQtType TDouble = "double"
 mapQtType TUnit = "const void *"
 mapQtType TString = "QString"
@@ -91,6 +106,7 @@ mapQtType TLText = "QString"
 
 mapLowCType :: Type -> String
 mapLowCType TInt = "int"
+mapLowCType TUTCTime = "uint" -- Not time_t because of Qt
 mapLowCType TDouble = "double"
 mapLowCType TUnit = "const void *"
 mapLowCType TString = "const char *"
@@ -99,6 +115,7 @@ mapLowCType TLText = "const char *"
 
 mapCType :: Type -> String
 mapCType TInt = "CInt"
+mapCType TUTCTime = "CUInt" -- Not CTime because of Qt
 mapCType TDouble = "CDouble"
 mapCType TUnit = "()"
 mapCType TString = "CString"
@@ -112,6 +129,7 @@ mapCRType (RIO t) = "IO " ++ mapCType t
 
 wrapTypeFromC :: Type -> String -> String
 wrapTypeFromC TInt arg = "(return $ fromIntegral " ++ arg ++ ")"
+wrapTypeFromC TUTCTime arg = "(return $ posixSecondsToUTCTime $ realToFrac " ++ arg ++ ")"
 wrapTypeFromC TDouble arg = "(return $ realToFrac " ++ arg ++ ")"
 wrapTypeFromC TString arg = "(fmap (Text.unpack . Text.decodeUtf8) (ByteString.packCString " ++ arg ++ "))"
 wrapTypeFromC TText arg = "(fmap Text.decodeUtf8 (ByteString.packCString " ++ arg ++ "))"
@@ -120,18 +138,21 @@ wrapTypeFromC _ arg = "(return " ++ arg ++ ")"
 
 wrapTypeToC :: Type -> String -> String
 wrapTypeToC TInt arg = "(flip ($) (fromIntegral " ++ arg ++ "))"
+wrapTypeToC TUTCTime arg = "(flip ($) (fromInteger $ floor $ utcTimeToPOSIXSeconds " ++ arg ++ "))"
 wrapTypeToC TDouble arg = "(flip ($) (realToFrac " ++ arg ++ "))"
 wrapTypeToC TString arg = "(ByteString.useAsCString (Text.encodeUtf8 $ Text.pack " ++ arg ++ "))"
 wrapTypeToC TText arg = "(ByteString.useAsCString (Text.encodeUtf8 " ++ arg ++ "))"
 wrapTypeToC TLText arg = "(ByteString.useAsCString (Text.encodeUtf8 $ LText.toStrict " ++ arg ++ "))"
 
 wrapTypeFromQt :: Type -> String -> String
+wrapTypeFromQt TUTCTime arg = "(" ++ arg ++ ").toTime_t()"
 wrapTypeFromQt TString arg = "(" ++ arg ++ ").toUtf8().constData()"
 wrapTypeFromQt TText arg = "(" ++ arg ++ ").toUtf8().constData()"
 wrapTypeFromQt TLText arg = "(" ++ arg ++ ").toUtf8().constData()"
 wrapTypeFromQt _ arg = "(" ++ arg ++ ")"
 
 wrapTypeToQt :: Type -> String -> String
+wrapTypeToQt TUTCTime arg = "(QDateTime::fromTime_t(" ++ arg ++ "))"
 wrapTypeToQt TString arg = "(QString::fromUtf8(" ++ arg ++ "))"
 wrapTypeToQt TText arg = "(QString::fromUtf8(" ++ arg ++ "))"
 wrapTypeToQt TLText arg = "(QString::fromUtf8(" ++ arg ++ "))"
@@ -139,6 +160,7 @@ wrapTypeToQt _ arg = "(" ++ arg ++ ")"
 
 defTypeToC :: Type -> String
 defTypeToC TInt = "(flip ($) 0)"
+defTypeToC TUTCTime = "(flip ($) 0)"
 defTypeToC TDouble = "(flip ($) 0)"
 defTypeToC TString = "(flip ($) nullPtr)"
 defTypeToC TText = "(flip ($) nullPtr)"

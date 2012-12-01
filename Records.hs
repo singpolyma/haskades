@@ -1,8 +1,5 @@
 module Records where
 
-data Type = TInt | TDouble | TString | TText | TLText | TUnit deriving (Show, Ord, Eq)
-data RType = RPure Type | RIO Type deriving (Show, Eq)
-
 data Template = Template {
 	modul :: String,
 	slots :: [Slot],
