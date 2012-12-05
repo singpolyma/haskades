@@ -40,7 +40,9 @@
 
 <p>Where Types.hs is a Haskell file containing a record type declaration named <code>Slots</code> and a sum type declaration named <code>Signals</code> which fully specifies the communication possible between the UI layer (which you write in QML) and the Haskell backend.  QML code can access these signals and slots on the <code>app</code> context object.  Haskell code can emit signals by using the <code>emit</code> function exported from the generated HaskadesBinding.  The <code>emit</code> call is threadsafe.</p>
 
-<p>Text, Lazy Text, and String all end up as QString so that QML can work with them properly, and vice-versa.  UTCTime becomes QDateTime. Int, Double, and () are passed through fairly directly.  Other types may have support added as there is need.</p>
+<p>Text, Lazy Text, and String all end up as QString so that QML can work with them properly, and vice-versa.  UTCTime becomes QDateTime. Int, Double, and () are passed through fairly directly.</p>
+
+<p>If you find bugs or missing features, please report them to <a href="https://github.com/singpolyma/haskades/issues">https://github.com/singpolyma/haskades/issues</a>.</p>
       </section>
     </div>
 
