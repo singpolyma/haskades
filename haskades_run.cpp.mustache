@@ -3,7 +3,12 @@
 #include <QTranslator>
 #include <bb/cascades/Application>
 #include <bb/cascades/QmlDocument>
-#include <bb/cascades/Page>
+#include <bb/cascades/AbstractPane>
+
+#ifdef USE_NOTIFICATIONS
+#include <bb/platform/Notification>
+#include <bb/platform/NotificationDialog>
+#endif
 
 QEvent::Type customSignalEventType;
 {{#signals}}
@@ -34,7 +39,12 @@ public:
 	AppWrapper(QString qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstarg}}, {{/firstarg}}{{lowctype}} {{aname}}{{/args}}){{/slots}}) :
 	qmlPath(qml_path){{#slots}},
 	_{{name}}(_{{name}}){{/slots}}
-	{ }
+	{
+#ifdef USE_NOTIFICATIONS
+qmlRegisterType<bb::platform::Notification>("bb.platform", 1, 0, "Notification");
+qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "NotificationDialog");
+#endif
+	}
 
 	virtual void ready() {
 		// Obtain a QMLDocument and load it into the qml variable, using build patterns.
