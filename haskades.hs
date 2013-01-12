@@ -4,12 +4,11 @@ import Data.List
 import Control.Error
 import Control.Arrow
 import Control.Applicative
-import System.IO
 import System.Environment (getArgs)
 import Language.Haskell.Parser
 import Language.Haskell.Syntax
-import Blaze.ByteString.Builder (toByteStringIO)
-import qualified Data.ByteString as BS
+import Data.Text.Lazy.Builder (toLazyText)
+import qualified Data.Text.Lazy.IO as TL
 import qualified Data.Map as M
 
 import Records
@@ -254,9 +253,5 @@ main = runScript $ do
 		}
 
 	[hsout, cppout] <- scriptIO getArgs
-	scriptIO $ withFile hsout WriteMode (\hsfile ->
-			toByteStringIO (BS.hPutStr hsfile) $ haskadesBindinghs id template
-		)
-	scriptIO $ withFile cppout WriteMode (\cppfile ->
-			toByteStringIO (BS.hPutStr cppfile) $ haskades_runcpp id template
-		)
+	scriptIO $ TL.writeFile hsout $ toLazyText $ haskadesBindinghs id template
+	scriptIO $ TL.writeFile cppout $ toLazyText $ haskades_runcpp id template

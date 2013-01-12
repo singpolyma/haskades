@@ -49,8 +49,8 @@ executable haskades
                 bytestring,
                 errors,
                 haskell-src,
-                blaze-builder,
-                wl-pprint
+                text,
+                text-format
 
 source-repository head
         type:     git

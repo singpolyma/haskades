@@ -31,7 +31,7 @@ MustacheTemplates.hs: HaskadesBinding.hs.mustache haskades_run.cpp.mustache Reco
 
 clean:
 	find -name '*.o' -o -name '*.hi' | xargs $(RM)
-	$(RM) -r dist dist-ghc
+	$(RM) -r dist dist-ghc MustacheTemplates.hs
 
 dist/build/haskades/haskades: haskades.cabal dist/setup-config haskades.hs Records.hs MustacheTemplates.hs
 	cabal build --ghc-options="$(GHCFLAGS)"
