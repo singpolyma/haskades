@@ -230,8 +230,15 @@ templateSignal signalTypes i (name, ts) = Signal {
 	where
 	(idxs, cwrap) = sigCWrap signalTypes $ zip [0..] ts
 
+parseArgs :: [String] -> Either String [String]
+parseArgs [a,b] = return [a,b]
+parseArgs _ =
+	Left "Usage: haskades HaskadesBinding.hs haskades_run.cpp < Types.hs"
+
 main :: IO ()
 main = runScript $ do
+	[hsout, cppout] <- hoistEither . parseArgs =<< scriptIO getArgs
+
 	(mod, importEnv, decls) <- fmap doParse (scriptIO getContents)
 	slots <- hoistEither $ getSlots importEnv decls
 	signals <- hoistEither $ getSignals importEnv decls
@@ -252,6 +259,5 @@ main = runScript $ do
 			signals = sigs
 		}
 
-	[hsout, cppout] <- scriptIO getArgs
 	scriptIO $ TL.writeFile hsout $ toLazyText $ haskadesBindinghs id template
 	scriptIO $ TL.writeFile cppout $ toLazyText $ haskades_runcpp id template
