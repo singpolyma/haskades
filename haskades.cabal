@@ -14,7 +14,8 @@ homepage:        http://github.com/singpolyma/haskades
 bug-reports:     http://github.com/singpolyma/haskades/issues
 build-type:      Simple
 description:
-        Autogeneration of bindings for creating BlackBerry Cascades apps with Haskell back ends.
+        Autogeneration of bindings for creating BlackBerry Cascades apps
+        with Haskell back ends.
         .
         Run as:
         .
