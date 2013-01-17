@@ -1,6 +1,14 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface, CPP #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
-module HaskadesBinding (haskadesRun, emit) where
+module HaskadesBinding (
+#ifdef USE_SENSORS
+	AccelerationMode,
+	AxesOrientationMode,
+	accelerometerStart,
+#endif
+	haskadesRun,
+	emit
+) where
 
 import Foreign.C.Types
 import Foreign.C.String
@@ -56,3 +64,23 @@ haskadesRun qmlPath (Slots {{#slots}}{{name}} {{/slots}}) = liftIO $ do
 
 	when (code /= 0) (exitWith $ ExitFailure $ fromIntegral code)
 	return ()
+
+#ifdef USE_SENSORS
+data AccelerationMode = AccelerationGravity | AccelerationUser | AccelerationCombined deriving (Show, Read, Eq, Enum)
+data AxesOrientationMode = AxesOrientationFixed | AxesOrientationAutomatic | AxesOrientationUser deriving (Show, Read, Eq, Enum)
+
+foreign import ccall "wrapper" _wrap_accelerometerCallback :: (CDouble -> CDouble -> CDouble -> IO CInt) -> IO (FunPtr (CDouble -> CDouble -> CDouble -> IO CInt))
+
+foreign import ccall safe "haskades_run.cpp accelerometer_start"
+	c_accelerometer_start ::
+	CInt -> CInt -> FunPtr (CDouble -> CDouble -> CDouble -> IO CInt) ->
+	IO ()
+
+enumToCInt :: (Enum a) => a -> CInt
+enumToCInt = fromIntegral . fromEnum
+
+accelerometerStart :: AccelerationMode -> AxesOrientationMode -> ((Double, Double, Double) -> IO Bool) -> IO ()
+accelerometerStart accelM axesM cb = _wrap_accelerometerCallback cb' >>= c_accelerometer_start (enumToCInt accelM) (enumToCInt axesM)
+	where
+	cb' x y z = fmap enumToCInt $ cb $! (realToFrac $! x, realToFrac $! y, realToFrac $! z)
+#endif

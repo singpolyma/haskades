@@ -5,6 +5,10 @@
 #include <bb/cascades/QmlDocument>
 #include <bb/cascades/AbstractPane>
 
+#ifdef USE_SENSORS
+#include <QtSensors/QAccelerometer>
+#endif
+
 #ifdef USE_NOTIFICATIONS
 #include <bb/platform/Notification>
 #include <bb/platform/NotificationDialog>
@@ -102,6 +106,39 @@ protected:
 {{/slots}}
 };
 
+#ifdef USE_SENSORS
+class AccelerometerHandler : public QObject {
+Q_OBJECT
+
+public:
+	AccelerometerHandler(QtMobility::QAccelerometer::AccelerationMode accelM, QtMobility::QAccelerometer::AxesOrientationMode axesM, int (*cb)(double, double, double)) : _cb(cb) {
+		_accel.setAccelerationMode(accelM);
+		_accel.setAxesOrientationMode(axesM);
+
+		connect(&_accel, SIGNAL(readingChanged()), SLOT(callback()));
+
+		if(!_accel.connectToBackend()) {
+			qCritical() << "CONNECT TO ACCELEROMETER BACKEND FAILED!";
+		} else if(!_accel.start()) {
+			qCritical() << "ACCELEROMETER START FAILED!";
+		}
+	}
+
+public slots:
+	void callback() {
+		QtMobility::QAccelerometerReading *r = _accel.reading();
+		if(!_cb((double)r->x(), (double)r->y(), (double)r->z())) {
+			_accel.stop();
+			delete this;
+		}
+	}
+
+protected:
+	QtMobility::QAccelerometer _accel;
+	int (*_cb)(double, double, double);
+};
+#endif
+
 extern "C" {
 
 QObject *mainAppGlobal;
@@ -137,6 +174,45 @@ int haskades_run(char *qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstar
 	// deletes all its children.
 	return bb::cascades::Application::exec();
 }
+
+#ifdef USE_SENSORS
+void accelerometer_start(int accelM, int axesM, int (*cb)(double, double, double)) {
+	QtMobility::QAccelerometer::AccelerationMode _accelM;
+	QtMobility::QAccelerometer::AxesOrientationMode _axesM;
+
+	switch(accelM) {
+		case 0:
+			_accelM = QtMobility::QAccelerometer::Gravity;
+			break;
+		case 1:
+			_accelM = QtMobility::QAccelerometer::User;
+			break;
+		case 2:
+			_accelM = QtMobility::QAccelerometer::Combined;
+			break;
+		default:
+			qWarning() << "Unknown AccelerationMode, defaulting to Combined";
+			_accelM = QtMobility::QAccelerometer::Combined;
+	}
+
+	switch(axesM) {
+		case 0:
+			_axesM = QtMobility::QAccelerometer::FixedOrientation;
+			break;
+		case 1:
+			_axesM = QtMobility::QAccelerometer::AutomaticOrientation;
+			break;
+		case 2:
+			_axesM = QtMobility::QAccelerometer::UserOrientation;
+			break;
+		default:
+			qWarning() << "Unknown AxesOrientationMode, defaulting to Automatic";
+			_axesM = QtMobility::QAccelerometer::AutomaticOrientation;
+	}
+
+	new AccelerometerHandler(_accelM, _axesM, cb);
+}
+#endif
 
 }
 
