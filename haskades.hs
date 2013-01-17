@@ -14,8 +14,8 @@ import qualified Data.Map as M
 import Records
 import MustacheTemplates
 
-data Type = TInt | TUTCTime | TDouble | TString | TText | TLText | TUnit deriving (Show, Ord, Eq)
-data RType = RPure Type | RIO Type deriving (Show, Eq)
+data Type = TInt | TUTCTime | TDouble | TString | TText | TLText deriving (Show, Ord, Eq)
+data RType = RPure Type | RIOUnit | RIO Type deriving (Show, Eq)
 
 importPrefix :: HsImportDecl -> String
 importPrefix (HsImportDecl {importQualified = True, importAs = Just (Module m)}) = m
@@ -61,7 +61,6 @@ findUTCTimeType i m = findType i m [
 	]
 
 resolveType :: [(String, Module)] -> HsType -> Either String Type
-resolveType _ (HsTyCon (Special HsUnitCon)) = Right TUnit
 resolveType _ (HsTyCon (UnQual (HsIdent "Int"))) = Right TInt
 resolveType _ (HsTyCon (UnQual (HsIdent "Double"))) = Right TDouble
 resolveType _ (HsTyCon (UnQual (HsIdent "String"))) = Right TString
@@ -72,6 +71,8 @@ resolveType i (HsTyCon (Qual m (HsIdent "UTCTime"))) = findUTCTimeType i m
 resolveType _ t = Left $ "Type not yet supported: " ++ show t
 
 resolveRType :: [(String, Module)] -> HsType -> Either String RType
+resolveRType _ (HsTyCon (Special HsUnitCon)) = Left "A pure function that returns () ?"
+resolveRType _ (HsTyApp (HsTyCon (UnQual (HsIdent "IO"))) (HsTyCon (Special HsUnitCon))) = return RIOUnit
 resolveRType i (HsTyApp (HsTyCon (UnQual (HsIdent "IO"))) t) = RIO <$> resolveType i t
 resolveRType i t = RPure <$> resolveType i t
 
@@ -106,7 +107,6 @@ mapQtType :: Type -> String
 mapQtType TInt = "int"
 mapQtType TUTCTime = "QDateTime"
 mapQtType TDouble = "double"
-mapQtType TUnit = "const void *"
 mapQtType TString = "QString"
 mapQtType TText = "QString"
 mapQtType TLText = "QString"
@@ -115,7 +115,6 @@ mapLowCType :: Type -> String
 mapLowCType TInt = "int"
 mapLowCType TUTCTime = "uint" -- Not time_t because of Qt
 mapLowCType TDouble = "double"
-mapLowCType TUnit = "const void *"
 mapLowCType TString = "const char *"
 mapLowCType TText = "const char *"
 mapLowCType TLText = "const char *"
@@ -124,13 +123,13 @@ mapCType :: Type -> String
 mapCType TInt = "CInt"
 mapCType TUTCTime = "CUInt" -- Not CTime because of Qt
 mapCType TDouble = "CDouble"
-mapCType TUnit = "()"
 mapCType TString = "CString"
 mapCType TText = "CString"
 mapCType TLText = "CString"
 
 -- We always live in IO on the C side
 mapCRType :: RType -> String
+mapCRType RIOUnit = "IO ()"
 mapCRType (RPure t) = "IO " ++ mapCType t
 mapCRType (RIO t) = "IO " ++ mapCType t
 
@@ -141,7 +140,7 @@ wrapTypeFromC TDouble arg = "(return $ realToFrac " ++ arg ++ ")"
 wrapTypeFromC TString arg = "(fmap (Text.unpack . Text.decodeUtf8) (ByteString.packCString " ++ arg ++ "))"
 wrapTypeFromC TText arg = "(fmap Text.decodeUtf8 (ByteString.packCString " ++ arg ++ "))"
 wrapTypeFromC TLText arg = "(fmap (LText.fromStrict . Text.decodeUtf8) (ByteString.packCString " ++ arg ++ "))"
-wrapTypeFromC _ arg = "(return " ++ arg ++ ")"
+--wrapTypeFromC _ arg = "(return " ++ arg ++ ")"
 
 wrapTypeToC :: Type -> String -> String
 wrapTypeToC TInt arg = "(flip ($) (fromIntegral " ++ arg ++ "))"
@@ -150,7 +149,6 @@ wrapTypeToC TDouble arg = "(flip ($) (realToFrac " ++ arg ++ "))"
 wrapTypeToC TString arg = "(ByteString.useAsCString (Text.encodeUtf8 $ Text.pack " ++ arg ++ "))"
 wrapTypeToC TText arg = "(ByteString.useAsCString (Text.encodeUtf8 " ++ arg ++ "))"
 wrapTypeToC TLText arg = "(ByteString.useAsCString (Text.encodeUtf8 $ LText.toStrict " ++ arg ++ "))"
-wrapTypeToC TUnit arg = "(flip ($) (" ++ arg ++ "))"
 
 wrapTypeFromQt :: Type -> String -> String
 wrapTypeFromQt TUTCTime arg = "(" ++ arg ++ ").toTime_t()"
@@ -173,14 +171,14 @@ defTypeToC TDouble = "(flip ($) 0)"
 defTypeToC TString = "(flip ($) nullPtr)"
 defTypeToC TText = "(flip ($) nullPtr)"
 defTypeToC TLText = "(flip ($) nullPtr)"
-defTypeToC TUnit = "(flip ($) nullPtr)"
 
 templateSlot :: (String, [Type], RType) -> Slot
 templateSlot (fname, args, rtype) = Slot {
 		name = fname,
 		monadic = case rtype of
 			RPure _ -> "(return " ++ fname ++ ")"
-			RIO _ -> "(" ++ fname ++ ")",
+			RIOUnit -> "(" ++ fname ++ ")"
+			RIO   _ -> "(" ++ fname ++ ")",
 		hasArgs = not (null args),
 		args = zipWith (\i a -> SlotArg {
 				firstarg = i == 0,
