@@ -30,7 +30,7 @@ foreign import ccall unsafe "start.cpp emit_CustomSignalEvent"
 emit :: (MonadIO m) => Signal -> m ()
 {{#signals}}
 emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) = liftIO (
-		({{sigcwrap}})
+		{{#sigcwrap}}({{sigcwrap}}){{/sigcwrap}}
 		(c_emit_CustomSignalEvent {{sigevent}})
 	)
 {{/signals}}
