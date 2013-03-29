@@ -100,8 +100,8 @@ getSignals i decls = signalDecl >>= signalsFrom >>= mapM signalConstr
 	signalConstr (n, ts) = (,) <$> pure n <*> mapM (resolveType i) ts
 	signalsFrom (HsDataDecl _ _ _ _ cons _) = mapM flattenSum cons
 	signalsFrom x = Left $ "Could not process signal near: " ++ show x
-	signalDecl = note "No sum type named \"Signal\" found." $
-		find (dataDeclNamed (HsIdent "Signal")) decls
+	signalDecl = note "No sum type named \"SignalToUI\" found." $
+		find (dataDeclNamed (HsIdent "SignalToUI")) decls
 
 mapQtType :: Type -> String
 mapQtType TInt = "int"
