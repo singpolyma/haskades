@@ -45,5 +45,7 @@ data SignalArg = SignalArg {
 	sigargfirst :: Bool,
 	siganame :: String,
 	qtsigargtype :: String,
+	csigargtype :: String,
+	hscsigargtype :: String,
 	sigargsigtypename :: String
 } deriving (Show)

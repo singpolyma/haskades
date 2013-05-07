@@ -1,0 +1,16 @@
+{{#signals}}
+#define CUSTOM_SIGNAL_{{signame}} {{sigevent}}
+{{/signals}}
+
+struct SignalsToUI {
+	unsigned int tag;
+	union {
+		{{#signals}}
+		struct {
+			{{#sigargs}}
+			{{csigargtype}} {{siganame}};
+			{{/sigargs}}
+		} {{signame}};
+		{{/signals}}
+	};
+};
