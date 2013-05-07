@@ -25,6 +25,12 @@ import qualified Data.ByteString as ByteString
 
 import {{modul}}
 
+data CTrans_SignalsToUI =
+	{{#signals}}
+	{{^sigfirst}}| {{/sigfirst}}CTrans_{{signame}}{{#sigargs}} {{hscsigargtype}}{{/sigargs}}
+
+	{{/signals}}
+
 foreign import ccall safe "haskades_run.cpp haskades_run"
 	c_haskades_run ::
 	CString -> {{#slots}}FunPtr ({{#args}}{{ctype}} -> {{/args}} {{crtype}}) -> {{/slots}}

@@ -215,6 +215,7 @@ sigCWrap es ts = (,) idxs $ case wraps of
 
 templateSignal :: [Type] -> Integer -> (String, [Type]) -> Signal
 templateSignal signalTypes i (name, ts) = Signal {
+	sigfirst = i == 1, -- This must be set to the initial eventid provided by main
 	signame = name,
 	sigargs = zipWith (\i t -> SignalArg {
 			sigargfirst = i == 0,

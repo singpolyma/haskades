@@ -35,6 +35,7 @@ data SignalType = SignalType {
 } deriving (Show)
 
 data Signal = Signal {
+	sigfirst :: Bool,
 	signame :: String,
 	sigargs :: [SignalArg],
 	sigevent :: Integer,

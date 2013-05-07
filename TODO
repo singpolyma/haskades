@@ -1,0 +1,7 @@
+haskell c structure
+convert from haskell to haskell-c
+Storable instance between hasckell c struct and native c struct
+convert from native c to QT
+construct signals from UI
+	1. convert back
+	2. use queue thingy
