@@ -10,6 +10,7 @@ module HaskadesBinding (
 	emit
 ) where
 
+import Foreign.Storable
 import Foreign.C.Types
 import Foreign.C.String
 import Foreign.Ptr
@@ -24,12 +25,6 @@ import qualified Data.Text.Lazy.Encoding as LText
 import qualified Data.ByteString as ByteString
 
 import {{modul}}
-
-data CTrans_SignalsToUI =
-	{{#signals}}
-	{{^sigfirst}}| {{/sigfirst}}CTrans_{{signame}}{{#sigargs}} {{hscsigargtype}}{{/sigargs}}
-
-	{{/signals}}
 
 foreign import ccall safe "haskades_run.cpp haskades_run"
 	c_haskades_run ::
