@@ -1,0 +1,64 @@
+#ifndef _HASKADES_SIGNAL_H_
+#define _HASKADES_SIGNAL_H_
+
+#include <stdlib.h>
+
+{{#signalsFromUI}}
+#define INBOUND_SIGNAL_{{signame}} {{sigevent}}
+{{/signalsFromUI}}
+{{#signalsToUI}}
+#define OUTBOUND_SIGNAL_{{signame}} {{sigevent}}
+{{/signalsToUI}}
+
+struct SignalFromUI {
+	unsigned int tag;
+	union {
+		{{#signalsFromUI}}
+		struct {
+			{{#sigargs}}
+			{{sigarg_ctype}} {{sigarg_name}};
+			{{/sigargs}}
+		} {{signame}};
+		{{/signalsFromUI}}
+	};
+};
+
+void free_SignalFromUI(struct SignalFromUI *sig) {
+	switch(sig->tag) {
+	{{#signalsFromUI}}
+		case INBOUND_SIGNAL_{{signame}}: /* {{sigevent}} */
+		{{#sigargs}}
+			{{sigarg_free}}
+		{{/sigargs}}
+			break;
+	{{/signalsFromUI}}
+	}
+	free(sig);
+}
+
+struct SignalToUI {
+	unsigned int tag;
+	union {
+		{{#signalsToUI}}
+		struct {
+			{{#sigargs}}
+			{{sigarg_ctype}} {{sigarg_name}};
+			{{/sigargs}}
+		} {{signame}};
+		{{/signalsToUI}}
+	};
+};
+
+void free_SignalToUI(struct SignalToUI *sig) {
+	switch(sig->tag) {
+	{{#signalsToUI}}
+		case INBOUND_SIGNAL_{{signame}}: /* {{sigevent}} */
+		{{#sigargs}}
+			{{sigarg_free}}
+		{{/sigargs}}
+			break;
+	{{/signalsToUI}}
+	}
+}
+
+#endif
