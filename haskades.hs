@@ -36,10 +36,6 @@ extractTypeFromBangType :: HsBangType -> HsType
 extractTypeFromBangType (HsBangedTy t) = t
 extractTypeFromBangType (HsUnBangedTy t) = t
 
-flatTyFun :: HsType -> HsType -> ([HsType], HsType)
-flatTyFun a (HsTyFun b c) = first (a:) (flatTyFun b c)
-flatTyFun a b = ([a], b)
-
 findType :: [(String, Module)] -> Module -> [(Module, Type)] -> Either String Type
 findType i (Module m) q =
 	headErr ("No " ++ show q ++ " imports find, but one used as type.") matches
@@ -69,12 +65,6 @@ resolveType i (HsTyCon (Qual m (HsIdent "Text"))) = findTextType i m
 resolveType i (HsTyCon (UnQual (HsIdent "UTCTime"))) = findUTCTimeType i (Module "")
 resolveType i (HsTyCon (Qual m (HsIdent "UTCTime"))) = findUTCTimeType i m
 resolveType _ t = Left $ "Type not yet supported: " ++ show t
-
-resolveRType :: [(String, Module)] -> HsType -> Either String RType
-resolveRType _ (HsTyCon (Special HsUnitCon)) = Left "A pure function that returns () ?"
-resolveRType _ (HsTyApp (HsTyCon (UnQual (HsIdent "IO"))) (HsTyCon (Special HsUnitCon))) = return RIOUnit
-resolveRType i (HsTyApp (HsTyCon (UnQual (HsIdent "IO"))) t) = RIO <$> resolveType i t
-resolveRType i t = RPure <$> resolveType i t
 
 flattenSum :: HsConDecl -> Either String (String, [HsType])
 flattenSum (HsConDecl _ (HsIdent n) ts) = Right (n, map extractTypeFromBangType ts)
@@ -121,12 +111,6 @@ mapCType TDouble = "CDouble"
 mapCType TString = "CString"
 mapCType TText = "CString"
 mapCType TLText = "CString"
-
--- We always live in IO on the C side
-mapCRType :: RType -> String
-mapCRType RIOUnit = "IO ()"
-mapCRType (RPure t) = "IO " ++ mapCType t
-mapCRType (RIO t) = "IO " ++ mapCType t
 
 wrapTypeFromC :: Type -> String
 wrapTypeFromC TInt = "fmap (fromIntegral :: CInt -> Int)"
