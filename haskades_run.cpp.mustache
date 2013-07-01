@@ -14,10 +14,9 @@
 #include <bb/platform/NotificationDialog>
 #endif
 
+#include "{{headerPath}}"
+
 QEvent::Type customSignalEventType;
-{{#toUI}}
-#define CUSTOM_SIGNAL_{{signame}} {{sigevent}}
-{{/toUI}}
 
 class CustomSignalEvent : public QEvent {
 
@@ -72,7 +71,7 @@ public:
 			CustomSignalEvent *ev = (CustomSignalEvent*)e;
 			switch(ev->signalEvent) {
 {{#toUI}}
-				case CUSTOM_SIGNAL_{{signame}}:
+				case TOUI_{{signame}}:
 					emit {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}ev->{{sigargsigtypename}}{{/sigargs}});
 					return true;
 					break;

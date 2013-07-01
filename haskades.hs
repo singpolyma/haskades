@@ -100,7 +100,7 @@ mapQtType TLText = "QString"
 
 mapLowCType :: Type -> String
 mapLowCType TInt = "int"
-mapLowCType TUTCTime = "uint" -- Not time_t because of Qt
+mapLowCType TUTCTime = "unsigned int" -- Not time_t because of Qt
 mapLowCType TDouble = "double"
 mapLowCType TString = "const char *"
 mapLowCType TText = "const char *"
@@ -120,14 +120,13 @@ mapCRType RIOUnit = "IO ()"
 mapCRType (RPure t) = "IO " ++ mapCType t
 mapCRType (RIO t) = "IO " ++ mapCType t
 
-wrapTypeFromC :: Type -> String -> String
-wrapTypeFromC TInt arg = "(return $ fromIntegral " ++ arg ++ ")"
-wrapTypeFromC TUTCTime arg = "(return $ posixSecondsToUTCTime $ realToFrac " ++ arg ++ ")"
-wrapTypeFromC TDouble arg = "(return $ realToFrac " ++ arg ++ ")"
-wrapTypeFromC TString arg = "(fmap (Text.unpack . Text.decodeUtf8) (ByteString.packCString " ++ arg ++ "))"
-wrapTypeFromC TText arg = "(fmap Text.decodeUtf8 (ByteString.packCString " ++ arg ++ "))"
-wrapTypeFromC TLText arg = "(fmap (LText.fromStrict . Text.decodeUtf8) (ByteString.packCString " ++ arg ++ "))"
---wrapTypeFromC _ arg = "(return " ++ arg ++ ")"
+wrapTypeFromC :: Type -> String
+wrapTypeFromC TInt = "fmap (fromIntegral :: CInt -> Int)"
+wrapTypeFromC TUTCTime = "fmap (posixSecondsToUTCTime . realToFrac :: CUInt -> UTCTime)"
+wrapTypeFromC TDouble = "fmap (realToFrac :: CDouble -> Double)"
+wrapTypeFromC TString = "fmap (Text.unpack . Text.decodeUtf8) . (ByteString.packCString =<<)"
+wrapTypeFromC TText = "fmap Text.decodeUtf8 . (ByteString.packCString =<<)"
+wrapTypeFromC TLText = "fmap (LText.fromStrict . Text.decodeUtf8) . (ByteString.packCString =<<)"
 
 wrapTypeToC :: Type -> String -> String
 wrapTypeToC TInt arg = "(flip ($) (fromIntegral " ++ arg ++ "))"
@@ -188,7 +187,7 @@ templateSignal signalTypes i (name, ts) = Signal {
 			siganame = "arg" ++ show i,
 			qtsigargtype = mapQtType t,
 			csigargtype = mapLowCType t,
-			hscsigargtype = mapCType t,
+			sigargfromc = wrapTypeFromC t,
 			sigargsigtypename = let Just x = lookup i idxs in "arg" ++ show x
 		}) [0..] ts,
 	sigevent = i,
@@ -200,11 +199,11 @@ templateSignal signalTypes i (name, ts) = Signal {
 parseArgs :: [String] -> Either String [String]
 parseArgs [a,b,c] = return [a,b,c]
 parseArgs _ =
-	Left "Usage: haskades HaskadesBinding.hs haskades_run.cpp structout.h < Types.hs"
+	Left "Usage: haskades HaskadesBinding.hsc haskades_run.cpp haskades_run.h < Types.hs"
 
 main :: IO ()
 main = runScript $ do
-	[hsout, cppout, structout] <- hoistEither . parseArgs =<< scriptIO getArgs
+	[hsout, cppout, headerPath] <- hoistEither . parseArgs =<< scriptIO getArgs
 
 	(mod, importEnv, decls) <- fmap doParse (scriptIO getContents)
 
@@ -221,14 +220,16 @@ main = runScript $ do
 		}) [(0::Int)..] toUItypes
 
 	fromUI <- hoistEither $ getSignals "SignalFromUI" importEnv decls
+	let fromUItmpl = zipWith (templateSignal []) [1..] fromUI
 
 	let template = Template {
+			headerPath = headerPath,
 			modul = mod,
 			toUItypes = toUItypeTmpl,
 			toUI = toUItmpl,
-			fromUI = []
+			fromUI = fromUItmpl
 		}
 
-	scriptIO $ TL.writeFile hsout $ toLazyText $ haskadesBindinghs id template
+	scriptIO $ TL.writeFile hsout $ toLazyText $ haskadesBindinghsc id template
 	scriptIO $ TL.writeFile cppout $ toLazyText $ haskades_runcpp id template
-	scriptIO $ TL.writeFile structout $ toLazyText $ signalsh id template
+	scriptIO $ TL.writeFile headerPath $ toLazyText $ haskades_runh id template

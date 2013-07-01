@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module HaskadesBinding (
 #ifdef USE_SENSORS
@@ -10,13 +10,19 @@ module HaskadesBinding (
 	emit
 ) where
 
+#include "{{headerPath}}"
+
+import Control.Applicative (pure, (<*>))
+import Control.Monad (when, ap, join)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import System.Exit (exitWith, ExitCode(ExitFailure))
+
 import Foreign.Storable
 import Foreign.C.Types
 import Foreign.C.String
 import Foreign.Ptr
-import System.Exit (exitWith, ExitCode(ExitFailure))
-import Control.Monad (when, ap, join)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+
+import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -44,6 +50,17 @@ emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) = liftIO (
 		(c_emit_CustomSignalEvent {{sigevent}})
 	)
 {{/toUI}}
+
+peekFromUI :: Ptr SignalFromUI -> IO SignalFromUI
+peekFromUI ptr = do
+	tag <- #{peek struct SignalFromUI, tag} ptr
+	case (tag :: CInt) of
+{{#fromUI}}
+		{{sigevent}} ->
+			pure {{signame}}{{#sigargs}} <*> (({{sigargfromc}}) (#{peek struct SignalFromUI, {{signame}}.{{siganame}}} ptr)){{/sigargs}}
+
+{{/fromUI}}
+		_ -> error "Corrupt SignalFromUI in peekFromUI (HaskadesBinding)"
 
 haskadesRun :: (MonadIO m) => String -> Slots -> m ()
 haskadesRun qmlPath = liftIO $ do

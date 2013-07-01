@@ -1,6 +1,7 @@
 module Records where
 
 data Template = Template {
+	headerPath :: String,
 	modul :: String,
 	toUItypes :: [SignalType],
 	toUI :: [Signal],
@@ -28,5 +29,6 @@ data SignalArg = SignalArg {
 	siganame :: String,
 	qtsigargtype :: String,
 	csigargtype :: String,
+	sigargfromc :: String,
 	sigargsigtypename :: String
 } deriving (Show)

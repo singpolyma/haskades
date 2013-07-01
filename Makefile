@@ -26,9 +26,9 @@ dist/doc/html/haskades/index.html: dist/setup-config haskades.hs Records.hs
 dist/setup-config: haskades.cabal
 	cabal configure
 
-MustacheTemplates.hs: HaskadesBinding.hs.mustache haskades_run.cpp.mustache signals.h.mustache Records.hs
-	mustache2hs -m Records.hs HaskadesBinding.hs.mustache Template \
-		haskades_run.cpp.mustache Template signals.h.mustache Template > MustacheTemplates.hs
+MustacheTemplates.hs: HaskadesBinding.hsc.mustache haskades_run.cpp.mustache haskades_run.h.mustache Records.hs
+	mustache2hs -m Records.hs HaskadesBinding.hsc.mustache Template \
+		haskades_run.cpp.mustache Template haskades_run.h.mustache Template > MustacheTemplates.hs
 
 clean:
 	find -name '*.o' -o -name '*.hi' | xargs $(RM)

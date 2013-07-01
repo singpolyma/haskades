@@ -1,0 +1,25 @@
+#ifndef _HASKADES_RUN_H
+#define _HASKADES_RUN_H
+
+{{#toUI}}
+#define TOUI_{{signame}} {{sigevent}}
+{{/toUI}}
+
+{{#fromUI}}
+#define FROMUI_{{signame}} {{sigevent}}
+{{/fromUI}}
+
+struct SignalFromUI {
+	unsigned int tag;
+	union {
+		{{#fromUI}}
+		struct {
+			{{#sigargs}}
+			{{csigargtype}} {{siganame}};
+			{{/sigargs}}
+		} {{signame}};
+		{{/fromUI}}
+	};
+};
+
+#endif /* _HASKADES_RUN_H */
