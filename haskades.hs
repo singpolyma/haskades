@@ -92,9 +92,9 @@ mapLowCType :: Type -> String
 mapLowCType TInt = "int"
 mapLowCType TUTCTime = "unsigned int" -- Not time_t because of Qt
 mapLowCType TDouble = "double"
-mapLowCType TString = "const char *"
-mapLowCType TText = "const char *"
-mapLowCType TLText = "const char *"
+mapLowCType TString = "char *"
+mapLowCType TText = "char *"
+mapLowCType TLText = "char *"
 
 destroyLowCArg :: Type -> String
 destroyLowCArg TInt = ""

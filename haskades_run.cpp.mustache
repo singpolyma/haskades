@@ -179,15 +179,7 @@ void emit_ToUIEvent(int signalEvent{{#toUItypes}}, {{lowcsigtype}} {{sigtypename
 	QCoreApplication::postEvent(mainAppGlobal, e);
 }
 
-SignalFromUI *lastFromUI = NULL;
-
-SignalFromUI *pop_SignalFromUI(void) {
-	if(lastFromUI) destroySignalFromUI(lastFromUI);
-	lastFromUI = signalFromUIQ.dequeue();
-	return lastFromUI;
-}
-
-destroySignalFromUI(SignalFromUI *s) {
+void destroySignalFromUI(SignalFromUI *s) {
 	switch(s->tag) {
 {{#fromUI}}
 			case FROMUI_{{signame}}:
@@ -201,6 +193,14 @@ destroySignalFromUI(SignalFromUI *s) {
 	}
 
 	free(s);
+}
+
+SignalFromUI *lastFromUI = NULL;
+
+SignalFromUI *pop_SignalFromUI(void) {
+	if(lastFromUI) destroySignalFromUI(lastFromUI);
+	lastFromUI = signalFromUIQ.dequeue();
+	return lastFromUI;
 }
 
 int haskades_run(char *qml_path) {
