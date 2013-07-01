@@ -28,40 +28,29 @@ import {{modul}}
 
 foreign import ccall safe "haskades_run.cpp haskades_run"
 	c_haskades_run ::
-	CString -> {{#slots}}FunPtr ({{#args}}{{ctype}} -> {{/args}} {{crtype}}) -> {{/slots}}
+	CString ->
+	-- ^ QML file to load and render
 	IO CInt
 
 foreign import ccall unsafe "start.cpp emit_CustomSignalEvent"
 	c_emit_CustomSignalEvent ::
-	CInt -> {{#signalTypes}}{{csigtype}} -> {{/signalTypes}}
+	CInt -> {{#toUItypes}}{{csigtype}} -> {{/toUItypes}}
 	IO ()
 
 emit :: (MonadIO m) => SignalToUI -> m ()
-{{#signals}}
+{{#toUI}}
 emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) = liftIO (
 		{{#sigcwrap}}({{sigcwrap}}){{/sigcwrap}}
 		(c_emit_CustomSignalEvent {{sigevent}})
 	)
-{{/signals}}
-
--- Function pointer wrappers
-{{#slots}}
-foreign import ccall "wrapper" wrap_{{name}} :: ({{#args}}{{ctype}} -> {{/args}} {{crtype}}) -> IO (FunPtr ({{#args}}{{ctype}} -> {{/args}} {{crtype}}))
-{{/slots}}
+{{/toUI}}
 
 haskadesRun :: (MonadIO m) => String -> Slots -> m ()
-haskadesRun qmlPath (Slots {{#slots}}{{name}} {{/slots}}) = liftIO $ do
-{{#slots}}
-	{{name}}Ptr <- wrap_{{name}} ({{#hasArgs}}\{{/hasArgs}}{{#args}}{{aname}} {{/args}}{{#hasArgs}}-> {{/hasArgs}}(join ((return {{monadic}}) {{#args}} `ap` {{cwrap}}{{/args}})) >>= {{crwrap}})
-{{/slots}}
+haskadesRun qmlPath = liftIO $ do
 
 	code <- ByteString.useAsCString (Text.encodeUtf8 $ Text.pack qmlPath) (\qmlPath ->
-			c_haskades_run qmlPath {{#slots}}{{name}}Ptr {{/slots}}
+			c_haskades_run qmlPath
 		)
-
-{{#slots}}
-	freeHaskellFunPtr {{name}}Ptr
-{{/slots}}
 
 	when (code /= 0) (exitWith $ ExitFailure $ fromIntegral code)
 	return ()

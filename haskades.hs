@@ -76,32 +76,19 @@ resolveRType _ (HsTyApp (HsTyCon (UnQual (HsIdent "IO"))) (HsTyCon (Special HsUn
 resolveRType i (HsTyApp (HsTyCon (UnQual (HsIdent "IO"))) t) = RIO <$> resolveType i t
 resolveRType i t = RPure <$> resolveType i t
 
-getSlots :: [(String, Module)] -> [HsDecl] -> Either String [(String, [Type], RType)]
-getSlots i decls = slotsDecl >>= slotsFrom >>= mapM slotField
-	where
-	slotField ([HsIdent fname], t) = case extractTypeFromBangType t of
-		(HsTyFun a b) -> let (args, r) = flatTyFun a b in
-			(,,) <$> pure fname <*> mapM (resolveType i) args <*> resolveRType i r
-		x -> (,,) <$> pure fname <*> pure [] <*> resolveRType i x
-	slotField (x, _) = Left $ "Expected field name, found: " ++ show x
-	slotsFrom (HsDataDecl _ _ _ _ [HsRecDecl _ (HsIdent "Slots") fields] _) = Right fields
-	slotsFrom _ = Left "Type \"Slots\" must have a single record constructor named \"Slots\"."
-	slotsDecl = note "No record named \"Slots\" found." $
-		find (dataDeclNamed (HsIdent "Slots")) decls
-
 flattenSum :: HsConDecl -> Either String (String, [HsType])
 flattenSum (HsConDecl _ (HsIdent n) ts) = Right (n, map extractTypeFromBangType ts)
 flattenSum (HsRecDecl _ (HsIdent n) ts) = Right (n, map (extractTypeFromBangType.snd) ts)
 flattenSum x = Left $ "Cannot process sum type constructor: " ++ show x
 
-getSignals :: [(String, Module)] -> [HsDecl] -> Either String [(String, [Type])]
-getSignals i decls = signalDecl >>= signalsFrom >>= mapM signalConstr
+getSignals :: String -> [(String, Module)] -> [HsDecl] -> Either String [(String, [Type])]
+getSignals dataName i decls = signalDecl >>= signalsFrom >>= mapM signalConstr
 	where
 	signalConstr (n, ts) = (,) <$> pure n <*> mapM (resolveType i) ts
 	signalsFrom (HsDataDecl _ _ _ _ cons _) = mapM flattenSum cons
 	signalsFrom x = Left $ "Could not process signal near: " ++ show x
 	signalDecl = note "No sum type named \"SignalToUI\" found." $
-		find (dataDeclNamed (HsIdent "SignalToUI")) decls
+		find (dataDeclNamed (HsIdent dataName)) decls
 
 mapQtType :: Type -> String
 mapQtType TInt = "int"
@@ -172,27 +159,6 @@ defTypeToC TString = "(flip ($) nullPtr)"
 defTypeToC TText = "(flip ($) nullPtr)"
 defTypeToC TLText = "(flip ($) nullPtr)"
 
-templateSlot :: (String, [Type], RType) -> Slot
-templateSlot (fname, args, rtype) = Slot {
-		name = fname,
-		monadic = case rtype of
-			RPure _ -> "(return " ++ fname ++ ")"
-			RIOUnit -> "(" ++ fname ++ ")"
-			RIO   _ -> "(" ++ fname ++ ")",
-		hasArgs = not (null args),
-		args = zipWith (\i a -> SlotArg {
-				firstarg = i == 0,
-				aname = "arg" ++ show i,
-				ctype = mapCType a,
-				lowctype = mapLowCType a,
-				qttype = mapQtType a,
-				cwrap = wrapTypeFromC a ("arg" ++ show i),
-				qtunwrap = wrapTypeFromQt a ("arg" ++ show i)
-			}) [(0::Int)..] args,
-		crtype = mapCRType rtype,
-		crwrap = "(return)" -- TODO
-	}
-
 sigCWrap' :: [(Int, Type)] -> [(Int, Type)] -> ([(Int, Int)], [String])
 sigCWrap' [] _ = ([], [])
 sigCWrap' ((ei,e):es) ts
@@ -241,23 +207,26 @@ main = runScript $ do
 	[hsout, cppout, structout] <- hoistEither . parseArgs =<< scriptIO getArgs
 
 	(mod, importEnv, decls) <- fmap doParse (scriptIO getContents)
-	slots <- hoistEither $ getSlots importEnv decls
-	signals <- hoistEither $ getSignals importEnv decls
-	let signalTypes = concatMap (\(t,c) -> replicate c t) $ M.toAscList $
-		M.unionsWith max $ map (M.fromListWith (+) . (`zip` [1,1..]) . snd) signals
-	let sigs = zipWith (templateSignal signalTypes) [1..] signals
-	let sigTypes = zipWith (\i t -> SignalType {
+
+	toUI <- hoistEither $ getSignals "SignalToUI" importEnv decls
+	let toUItypes = concatMap (\(t,c) -> replicate c t) $ M.toAscList $
+		M.unionsWith max $ map (M.fromListWith (+) . (`zip` [1,1..]) . snd) toUI
+	let toUItmpl = zipWith (templateSignal toUItypes) [1..] toUI
+	let toUItypeTmpl = zipWith (\i t -> SignalType {
 			csigtype = mapCType t,
 			qtsigtype = mapQtType t,
 			qtwrapsig = wrapTypeToQt t ("arg" ++ show i),
 			lowcsigtype = mapLowCType t,
 			sigtypename = "arg" ++ show i
-		}) [(0::Int)..] signalTypes
+		}) [(0::Int)..] toUItypes
+
+	fromUI <- hoistEither $ getSignals "SignalFromUI" importEnv decls
+
 	let template = Template {
 			modul = mod,
-			slots = map templateSlot slots,
-			signalTypes = sigTypes,
-			signals = sigs
+			toUItypes = toUItypeTmpl,
+			toUI = toUItmpl,
+			fromUI = []
 		}
 
 	scriptIO $ TL.writeFile hsout $ toLazyText $ haskadesBindinghs id template

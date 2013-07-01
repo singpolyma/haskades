@@ -2,28 +2,9 @@ module Records where
 
 data Template = Template {
 	modul :: String,
-	slots :: [Slot],
-	signalTypes :: [SignalType],
-	signals :: [Signal]
-} deriving (Show)
-
-data Slot = Slot {
-	name :: String,
-	monadic :: String,
-	args :: [SlotArg],
-	hasArgs :: Bool,
-	crtype :: String,
-	crwrap :: String
-} deriving (Show)
-
-data SlotArg = SlotArg {
-	firstarg :: Bool,
-	aname :: String,
-	ctype :: String,
-	lowctype :: String,
-	qttype :: String,
-	cwrap :: String,
-	qtunwrap :: String
+	toUItypes :: [SignalType],
+	toUI :: [Signal],
+	fromUI :: [Signal]
 } deriving (Show)
 
 data SignalType = SignalType {

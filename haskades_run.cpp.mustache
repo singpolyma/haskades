@@ -15,24 +15,24 @@
 #endif
 
 QEvent::Type customSignalEventType;
-{{#signals}}
+{{#toUI}}
 #define CUSTOM_SIGNAL_{{signame}} {{sigevent}}
-{{/signals}}
+{{/toUI}}
 
 class CustomSignalEvent : public QEvent {
 
 public:
-	CustomSignalEvent(int signalEvent{{#signalTypes}}, {{qtsigtype}} {{sigtypename}}{{/signalTypes}}) : QEvent(customSignalEventType) {
+	CustomSignalEvent(int signalEvent{{#toUItypes}}, {{qtsigtype}} {{sigtypename}}{{/toUItypes}}) : QEvent(customSignalEventType) {
 		this->signalEvent = signalEvent;
-{{#signalTypes}}
+{{#toUItypes}}
 		this->{{sigtypename}} = {{sigtypename}};
-{{/signalType}}
+{{/toUItypes}}
 	}
 
 	int signalEvent;
-{{#signalTypes}}
+{{#toUItypes}}
 	{{qtsigtype}} {{sigtypename}};
-{{/signalType}}
+{{/toUItypes}}
 };
 
 class AppWrapper: public QObject {
@@ -40,13 +40,10 @@ Q_OBJECT
 
 public:
 	// This is our constructor that sets up the recipe.
-	AppWrapper(QString qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstarg}}, {{/firstarg}}{{lowctype}} {{aname}}{{/args}}){{/slots}}) :
-	qmlPath(qml_path){{#slots}},
-	_{{name}}(_{{name}}){{/slots}}
-	{
+	AppWrapper(QString qml_path) : qmlPath(qml_path) {
 #ifdef USE_NOTIFICATIONS
-qmlRegisterType<bb::platform::Notification>("bb.platform", 1, 0, "Notification");
-qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "NotificationDialog");
+		qmlRegisterType<bb::platform::Notification>("bb.platform", 1, 0, "Notification");
+		qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "NotificationDialog");
 #endif
 	}
 
@@ -74,12 +71,12 @@ qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "Notifica
 		if(e->type() == customSignalEventType) {
 			CustomSignalEvent *ev = (CustomSignalEvent*)e;
 			switch(ev->signalEvent) {
-{{#signals}}
+{{#toUI}}
 				case CUSTOM_SIGNAL_{{signame}}:
 					emit {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}ev->{{sigargsigtypename}}{{/sigargs}});
 					return true;
 					break;
-{{/signals}}
+{{/toUI}}
 			}
 			return false;
 		} else {
@@ -87,23 +84,13 @@ qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "Notifica
 		}
 	}
 
-public slots:
-{{#slots}}
-	Q_INVOKABLE void {{name}}({{#args}}{{^firstarg}}, {{/firstarg}}{{qttype}} {{aname}}{{/args}}) {
-		_{{name}}({{#args}}{{^firstarg}}, {{/firstarg}}{{qtunwrap}}{{/args}});
-	}
-{{/slots}}
-
 signals:
-{{#signals}}
+{{#toUI}}
 	void {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}{{qtsigargtype}}{{/sigargs}});
-{{/signals}}
+{{/toUI}}
 
 protected:
 	QString qmlPath;
-{{#slots}}
-	void (*_{{name}})({{#args}}{{^firstarg}}, {{/firstarg}}{{lowctype}} {{aname}}{{/args}});
-{{/slots}}
 };
 
 #ifdef USE_SENSORS
@@ -143,12 +130,12 @@ extern "C" {
 
 QObject *mainAppGlobal;
 
-void emit_CustomSignalEvent(int signalEvent{{#signalTypes}}, {{lowcsigtype}} {{sigtypename}}{{/signalTypes}}) {
-	QEvent *e = (QEvent *)new CustomSignalEvent(signalEvent{{#signalTypes}}, {{qtwrapsig}}{{/signalTypes}});
+void emit_CustomSignalEvent(int signalEvent{{#toUItypes}}, {{lowcsigtype}} {{sigtypename}}{{/toUItypes}}) {
+	QEvent *e = (QEvent *)new CustomSignalEvent(signalEvent{{#toUItypes}}, {{qtwrapsig}}{{/toUItypes}});
 	QCoreApplication::postEvent(mainAppGlobal, e);
 }
 
-int haskades_run(char *qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstarg}}, {{/firstarg}}{{lowctype}} {{aname}}{{/args}}){{/slots}}) {
+int haskades_run(char *qml_path) {
 	int argc = 0;
 	char *argv[] = { NULL };
 	// Instantiate the main application constructor.
@@ -165,7 +152,7 @@ int haskades_run(char *qml_path{{#slots}}, void (*_{{name}})({{#args}}{{^firstar
 	customSignalEventType = (QEvent::Type)QEvent::registerEventType();
 
 	// Initialize our application.
-	AppWrapper mainApp(QString::fromUtf8(qml_path){{#slots}}, _{{name}}{{/slots}});
+	AppWrapper mainApp(QString::fromUtf8(qml_path));
 	mainAppGlobal = (QObject*)&mainApp;
 	mainApp.ready();
 
