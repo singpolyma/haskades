@@ -174,7 +174,7 @@ extern "C" {
 
 QObject *mainAppGlobal;
 
-void emit_ToUIEvent(int signalEvent{{#toUItypes}}, {{lowcsigtype}} {{sigtypename}}{{/toUItypes}}) {
+Q_DECL_EXPORT void emit_ToUIEvent(int signalEvent{{#toUItypes}}, {{lowcsigtype}} {{sigtypename}}{{/toUItypes}}) {
 	QEvent *e = (QEvent *)new ToUIEvent(signalEvent{{#toUItypes}}, {{qtwrapsig}}{{/toUItypes}});
 	QCoreApplication::postEvent(mainAppGlobal, e);
 }
@@ -197,13 +197,13 @@ void destroySignalFromUI(SignalFromUI *s) {
 
 SignalFromUI *lastFromUI = NULL;
 
-SignalFromUI *pop_SignalFromUI(void) {
+Q_DECL_EXPORT SignalFromUI *pop_SignalFromUI(void) {
 	if(lastFromUI) destroySignalFromUI(lastFromUI);
 	lastFromUI = signalFromUIQ.dequeue();
 	return lastFromUI;
 }
 
-int haskades_run(char *qml_path) {
+Q_DECL_EXPORT int haskades_run(char *qml_path) {
 	int argc = 0;
 	char *argv[] = { NULL };
 	// Instantiate the main application constructor.
