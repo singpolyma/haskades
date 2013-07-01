@@ -1,6 +1,11 @@
 #include <QtDebug>
 #include <QLocale>
 #include <QTranslator>
+
+#include <QQueue>
+#include <QSemaphore>
+#include <QMutex>
+
 #include <bb/cascades/Application>
 #include <bb/cascades/QmlDocument>
 #include <bb/cascades/AbstractPane>
@@ -17,6 +22,36 @@
 #include "{{headerPath}}"
 
 QEvent::Type toUIEventType;
+
+template<class T> class ThreadSafeQueue {
+public:
+	ThreadSafeQueue() : semFree(32), semUsed(0) { }
+
+	void enqueue(const T &value) {
+		semFree.acquire(1);
+		mutex.lock();
+		queue.enqueue(value);
+		mutex.unlock();
+		semUsed.release(1);
+	}
+
+	T dequeue() {
+		semUsed.acquire(1);
+		mutex.lock();
+		T val = queue.dequeue();
+		mutex.unlock();
+		semFree.release(1);
+		return val;
+	}
+
+protected:
+	QQueue<T> queue;
+	QSemaphore semFree;
+	QSemaphore semUsed;
+	QMutex mutex;
+};
+
+ThreadSafeQueue<SignalFromUI*> signalFromUIQ;
 
 class ToUIEvent : public QEvent {
 
@@ -83,6 +118,16 @@ public:
 		}
 	}
 
+{{#fromUI}}
+	Q_INVOKABLE void {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}{{qtsigargtype}} {{siganame}}{{/sigargs}}) {
+		SignalFromUI *s = new SignalFromUI;
+{{#sigargs}}
+		s->{{signame}}.{{siganame}} = {{sigargfromqt}};
+{{/sigargs}}
+		signalFromUIQ.enqueue(s);
+	}
+{{/fromUI}}
+
 signals:
 {{#toUI}}
 	void {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}{{qtsigargtype}}{{/sigargs}});
@@ -132,6 +177,30 @@ QObject *mainAppGlobal;
 void emit_ToUIEvent(int signalEvent{{#toUItypes}}, {{lowcsigtype}} {{sigtypename}}{{/toUItypes}}) {
 	QEvent *e = (QEvent *)new ToUIEvent(signalEvent{{#toUItypes}}, {{qtwrapsig}}{{/toUItypes}});
 	QCoreApplication::postEvent(mainAppGlobal, e);
+}
+
+SignalFromUI *lastFromUI = NULL;
+
+SignalFromUI *pop_SignalFromUI(void) {
+	if(lastFromUI) destroySignalFromUI(lastFromUI);
+	lastFromUI = signalFromUIQ.dequeue();
+	return lastFromUI;
+}
+
+destroySignalFromUI(SignalFromUI *s) {
+	switch(s->tag) {
+{{#fromUI}}
+			case FROMUI_{{signame}}:
+{{#sigargs}}
+{{#sigargdestroy}}
+				{{sigargdestroy}}(s->{{signame}}.{{siganame}});
+{{/sigargdestroy}}
+{{/sigargs}}
+				break;
+{{/fromUI}}
+	}
+
+	free(s);
 }
 
 int haskades_run(char *qml_path) {

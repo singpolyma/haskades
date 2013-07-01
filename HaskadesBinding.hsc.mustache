@@ -7,7 +7,8 @@ module HaskadesBinding (
 	accelerometerStart,
 #endif
 	haskadesRun,
-	emit
+	emit,
+	popSignalFromUI
 ) where
 
 #include "{{headerPath}}"
@@ -38,10 +39,14 @@ foreign import ccall safe "haskades_run.cpp haskades_run"
 	-- ^ QML file to load and render
 	IO CInt
 
-foreign import ccall unsafe "start.cpp emit_ToUIEvent"
+foreign import ccall unsafe "haskades_run.cpp emit_ToUIEvent"
 	c_emit_ToUIEvent ::
 	CInt -> {{#toUItypes}}{{csigtype}} -> {{/toUItypes}}
 	IO ()
+
+foreign import ccall unsafe "haskades_run.cpp pop_SignalFromUI"
+	c_pop_SignalFromUI ::
+	IO (Ptr SignalFromUI)
 
 emit :: (MonadIO m) => SignalToUI -> m ()
 {{#toUI}}
@@ -50,6 +55,9 @@ emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) = liftIO (
 		(c_emit_ToUIEvent {{sigevent}})
 	)
 {{/toUI}}
+
+popSignalFromUI :: (MonadIO m) => m SignalFromUI
+popSignalFromUI = liftIO (c_pop_SignalFromUI >>= peekFromUI)
 
 peekFromUI :: Ptr SignalFromUI -> IO SignalFromUI
 peekFromUI ptr = do

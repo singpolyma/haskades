@@ -106,6 +106,14 @@ mapLowCType TString = "const char *"
 mapLowCType TText = "const char *"
 mapLowCType TLText = "const char *"
 
+destroyLowCArg :: Type -> String
+destroyLowCArg TInt = ""
+destroyLowCArg TUTCTime = ""
+destroyLowCArg TDouble = ""
+destroyLowCArg TString = "free"
+destroyLowCArg TText = "free"
+destroyLowCArg TLText = "free"
+
 mapCType :: Type -> String
 mapCType TInt = "CInt"
 mapCType TUTCTime = "CUInt" -- Not CTime because of Qt
@@ -138,9 +146,9 @@ wrapTypeToC TLText arg = "(ByteString.useAsCString (Text.encodeUtf8 $ LText.toSt
 
 wrapTypeFromQt :: Type -> String -> String
 wrapTypeFromQt TUTCTime arg = "(" ++ arg ++ ").toTime_t()"
-wrapTypeFromQt TString arg = "(" ++ arg ++ ").toUtf8().constData()"
-wrapTypeFromQt TText arg = "(" ++ arg ++ ").toUtf8().constData()"
-wrapTypeFromQt TLText arg = "(" ++ arg ++ ").toUtf8().constData()"
+wrapTypeFromQt TString arg = "qstrdup((" ++ arg ++ ").toUtf8().constData())"
+wrapTypeFromQt TText arg = "qstrdup((" ++ arg ++ ").toUtf8().constData())"
+wrapTypeFromQt TLText arg = "qstrdup((" ++ arg ++ ").toUtf8().constData())"
 wrapTypeFromQt _ arg = "(" ++ arg ++ ")"
 
 wrapTypeToQt :: Type -> String -> String
@@ -188,6 +196,8 @@ templateSignal signalTypes i (name, ts) = Signal {
 			qtsigargtype = mapQtType t,
 			csigargtype = mapLowCType t,
 			sigargfromc = wrapTypeFromC t,
+			sigargfromqt = wrapTypeFromQt t ("arg" ++ show i),
+			sigargdestroy = destroyLowCArg t,
 			sigargsigtypename = let Just x = lookup i idxs in "arg" ++ show x
 		}) [0..] ts,
 	sigevent = i,
