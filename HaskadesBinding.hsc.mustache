@@ -44,7 +44,7 @@ foreign import ccall unsafe "haskades_run.cpp emit_ToUIEvent"
 	CInt -> {{#toUItypes}}{{csigtype}} -> {{/toUItypes}}
 	IO ()
 
-foreign import ccall unsafe "haskades_run.cpp pop_SignalFromUI"
+foreign import ccall safe "haskades_run.cpp pop_SignalFromUI"
 	c_pop_SignalFromUI ::
 	IO (Ptr SignalFromUI)
 
