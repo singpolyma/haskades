@@ -121,6 +121,7 @@ public:
 {{#fromUI}}
 	Q_INVOKABLE void {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}{{qtsigargtype}} {{siganame}}{{/sigargs}}) {
 		SignalFromUI *s = new SignalFromUI;
+		s->tag = {{sigevent}};
 {{#sigargs}}
 		s->{{signame}}.{{siganame}} = {{sigargfromqt}};
 {{/sigargs}}
