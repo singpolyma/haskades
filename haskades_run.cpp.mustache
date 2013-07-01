@@ -16,12 +16,12 @@
 
 #include "{{headerPath}}"
 
-QEvent::Type customSignalEventType;
+QEvent::Type toUIEventType;
 
-class CustomSignalEvent : public QEvent {
+class ToUIEvent : public QEvent {
 
 public:
-	CustomSignalEvent(int signalEvent{{#toUItypes}}, {{qtsigtype}} {{sigtypename}}{{/toUItypes}}) : QEvent(customSignalEventType) {
+	ToUIEvent(int signalEvent{{#toUItypes}}, {{qtsigtype}} {{sigtypename}}{{/toUItypes}}) : QEvent(toUIEventType) {
 		this->signalEvent = signalEvent;
 {{#toUItypes}}
 		this->{{sigtypename}} = {{sigtypename}};
@@ -67,8 +67,8 @@ public:
 	}
 
 	virtual bool event(QEvent *e) {
-		if(e->type() == customSignalEventType) {
-			CustomSignalEvent *ev = (CustomSignalEvent*)e;
+		if(e->type() == toUIEventType) {
+			ToUIEvent *ev = (ToUIEvent*)e;
 			switch(ev->signalEvent) {
 {{#toUI}}
 				case TOUI_{{signame}}:
@@ -129,8 +129,8 @@ extern "C" {
 
 QObject *mainAppGlobal;
 
-void emit_CustomSignalEvent(int signalEvent{{#toUItypes}}, {{lowcsigtype}} {{sigtypename}}{{/toUItypes}}) {
-	QEvent *e = (QEvent *)new CustomSignalEvent(signalEvent{{#toUItypes}}, {{qtwrapsig}}{{/toUItypes}});
+void emit_ToUIEvent(int signalEvent{{#toUItypes}}, {{lowcsigtype}} {{sigtypename}}{{/toUItypes}}) {
+	QEvent *e = (QEvent *)new ToUIEvent(signalEvent{{#toUItypes}}, {{qtwrapsig}}{{/toUItypes}});
 	QCoreApplication::postEvent(mainAppGlobal, e);
 }
 
@@ -148,7 +148,7 @@ int haskades_run(char *qml_path) {
 		app.installTranslator(&translator);
 	}
 
-	customSignalEventType = (QEvent::Type)QEvent::registerEventType();
+	toUIEventType = (QEvent::Type)QEvent::registerEventType();
 
 	// Initialize our application.
 	AppWrapper mainApp(QString::fromUtf8(qml_path));

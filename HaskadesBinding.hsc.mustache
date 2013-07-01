@@ -38,8 +38,8 @@ foreign import ccall safe "haskades_run.cpp haskades_run"
 	-- ^ QML file to load and render
 	IO CInt
 
-foreign import ccall unsafe "start.cpp emit_CustomSignalEvent"
-	c_emit_CustomSignalEvent ::
+foreign import ccall unsafe "start.cpp emit_ToUIEvent"
+	c_emit_ToUIEvent ::
 	CInt -> {{#toUItypes}}{{csigtype}} -> {{/toUItypes}}
 	IO ()
 
@@ -47,7 +47,7 @@ emit :: (MonadIO m) => SignalToUI -> m ()
 {{#toUI}}
 emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) = liftIO (
 		{{#sigcwrap}}({{sigcwrap}}){{/sigcwrap}}
-		(c_emit_CustomSignalEvent {{sigevent}})
+		(c_emit_ToUIEvent {{sigevent}})
 	)
 {{/toUI}}
 
@@ -62,7 +62,7 @@ peekFromUI ptr = do
 {{/fromUI}}
 		_ -> error "Corrupt SignalFromUI in peekFromUI (HaskadesBinding)"
 
-haskadesRun :: (MonadIO m) => String -> Slots -> m ()
+haskadesRun :: (MonadIO m) => String -> m ()
 haskadesRun qmlPath = liftIO $ do
 
 	code <- ByteString.useAsCString (Text.encodeUtf8 $ Text.pack qmlPath) (\qmlPath ->
