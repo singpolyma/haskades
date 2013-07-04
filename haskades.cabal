@@ -1,14 +1,14 @@
 name:            haskades
-version:         0.1.1
+version:         0.2.0
 cabal-version:   >= 1.8
 license:         OtherLicense
 license-file:    COPYING
 category:        Utility
-copyright:       © 2012 Stephen Paul Weber
+copyright:       © 2012-2013 Stephen Paul Weber
 author:          Stephen Paul Weber <singpolyma@singpolyma.net>
 maintainer:      Stephen Paul Weber <singpolyma@singpolyma.net>
 stability:       experimental
-tested-with:     GHC == 7.0.3
+tested-with:     GHC == 7.4.2
 synopsis:        Utility to generate bindings for BlackBerry Cascades
 homepage:        http://github.com/singpolyma/haskades
 bug-reports:     http://github.com/singpolyma/haskades/issues
@@ -33,6 +33,8 @@ description:
         work with them properly, and vice-versa.  UTCTime becomes QDateTime.
         Int, Double, and () are passed through fairly directly.  Other types
         may have support added as there is need.
+        .
+        A simple example lives at <https://github.com/singpolyma/haskades-sample>
 
 extra-source-files:
         README

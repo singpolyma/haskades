@@ -17,3 +17,5 @@ Text, Lazy Text, and String all end up as QString so that QML can
 work with them properly, and vice-versa.  UTCTime becomes QDateTime.
 Int, Double, and () are passed through fairly directly.  Other types
 may have support added as there is need.
+
+A simple example lives at <https://github.com/singpolyma/haskades-sample>
