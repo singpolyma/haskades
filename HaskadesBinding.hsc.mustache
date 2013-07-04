@@ -15,7 +15,7 @@ module HaskadesBinding (
 import Control.Applicative (pure, (<*>))
 import Control.Monad (when, ap, join, forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Concurrent (forkIO, killThread)
+import Control.Concurrent (forkIO)
 import System.Exit (exitWith, ExitCode(ExitFailure))
 
 import Foreign.Storable
@@ -73,13 +73,11 @@ peekFromUI ptr = do
 haskadesRun :: (MonadIO m) => String -> (SignalFromUI -> IO ()) -> m ()
 haskadesRun qmlPath handler = liftIO $ do
 
-	threadId <- forkIO (forever $ popSignalFromUI >>= handler)
+	_ <- forkIO (forever $ popSignalFromUI >>= handler)
 
 	code <- ByteString.useAsCString (Text.encodeUtf8 $ Text.pack qmlPath) (\qmlPath ->
 			c_haskades_run qmlPath
 		)
-
-	killThread threadId
 
 	when (code /= 0) (exitWith $ ExitFailure $ fromIntegral code)
 	return ()
