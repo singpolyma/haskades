@@ -7,15 +7,15 @@ module HaskadesBinding (
 	accelerometerStart,
 #endif
 	haskadesRun,
-	emit,
-	popSignalFromUI
+	emit
 ) where
 
 #include "{{headerPath}}"
 
 import Control.Applicative (pure, (<*>))
-import Control.Monad (when, ap, join)
+import Control.Monad (when, ap, join, forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Concurrent (forkIO, killThread)
 import System.Exit (exitWith, ExitCode(ExitFailure))
 
 import Foreign.Storable
@@ -70,12 +70,16 @@ peekFromUI ptr = do
 {{/fromUI}}
 		_ -> error "Corrupt SignalFromUI in peekFromUI (HaskadesBinding)"
 
-haskadesRun :: (MonadIO m) => String -> m ()
-haskadesRun qmlPath = liftIO $ do
+haskadesRun :: (MonadIO m) => String -> (SignalFromUI -> IO ()) -> m ()
+haskadesRun qmlPath handler = liftIO $ do
+
+	threadId <- forkIO (forever $ popSignalFromUI >>= handler)
 
 	code <- ByteString.useAsCString (Text.encodeUtf8 $ Text.pack qmlPath) (\qmlPath ->
 			c_haskades_run qmlPath
 		)
+
+	killThread threadId
 
 	when (code /= 0) (exitWith $ ExitFailure $ fromIntegral code)
 	return ()
