@@ -19,6 +19,10 @@
 #include <bb/platform/NotificationDialog>
 #endif
 
+#ifdef USE_INVOCATIONS
+#include <bb/system/InvokeManager>
+#endif
+
 #include "{{headerPath}}"
 
 QEvent::Type toUIEventType;
@@ -88,6 +92,9 @@ public:
 		// If the QML document is valid, we process it.
 		if(!qml->hasErrors()) {
 			qml->setContextProperty("app", this);
+#ifdef USE_INVOCATIONS
+			qml->setContextProperty("invokeManager", &this->invokeManager);
+#endif
 
 			// Create the application root from QMLDocument
 			bb::cascades::AbstractPane *appPage = qml->createRootObject<bb::cascades::AbstractPane>();
@@ -129,6 +136,20 @@ public:
 	}
 {{/fromUI}}
 
+#ifdef USE_NOTIFICATIONS
+#ifdef USE_INVOCATIONS
+	Q_INVOKABLE void addInvokeRequestToNotification(bb::platform::Notification *  notification, QString target, QString action, QString mimeType, QString uri,     QString data) {
+		bb::system::InvokeRequest invokeRequest;
+		invokeRequest.setTarget(target);
+		invokeRequest.setAction(action);
+		invokeRequest.setMimeType(mimeType);
+		invokeRequest.setUri(uri);
+		invokeRequest.setData(data.toUtf8());
+		notification->setInvokeRequest(invokeRequest);
+	}
+#endif
+#endif
+
 signals:
 {{#toUI}}
 	void {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}{{qtsigargtype}}{{/sigargs}});
@@ -136,6 +157,9 @@ signals:
 
 protected:
 	QString qmlPath;
+#ifdef USE_INVOCATIONS
+	bb::system::InvokeManager invokeManager;
+#endif
 };
 
 #ifdef USE_SENSORS
