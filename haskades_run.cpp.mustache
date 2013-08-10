@@ -79,6 +79,9 @@ Q_OBJECT
 public:
 	// This is our constructor that sets up the recipe.
 	AppWrapper(QString qml_path) : qmlPath(qml_path) {
+#ifdef USE_INVOCATIONS
+		connect(&this->invokeManager, SIGNAL(invoked(const bb::system::InvokeRequest&)), this, SLOT(wasInvoked(const bb::system::InvokeRequest&)));
+#endif
 #ifdef USE_NOTIFICATIONS
 		qmlRegisterType<bb::platform::Notification>("bb.platform", 1, 0, "Notification");
 		qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "NotificationDialog");
@@ -92,9 +95,6 @@ public:
 		// If the QML document is valid, we process it.
 		if(!qml->hasErrors()) {
 			qml->setContextProperty("app", this);
-#ifdef USE_INVOCATIONS
-			qml->setContextProperty("invokeManager", &this->invokeManager);
-#endif
 
 			// Create the application root from QMLDocument
 			bb::cascades::AbstractPane *appPage = qml->createRootObject<bb::cascades::AbstractPane>();
@@ -154,6 +154,15 @@ signals:
 {{#toUI}}
 	void {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}{{qtsigargtype}}{{/sigargs}});
 {{/toUI}}
+
+#ifdef USE_INVOCATIONS
+	void invoked(QString, QString, QString, QString, QString);
+
+protected slots:
+	void wasInvoked(const bb::system::InvokeRequest &req) {
+		emit invoked(req.target(), req.action(), req.mimeType(), req.uri().toString(), QString::fromUtf8(req.data()));
+	}
+#endif
 
 protected:
 	QString qmlPath;
