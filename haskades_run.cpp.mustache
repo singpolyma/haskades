@@ -29,9 +29,11 @@ QEvent::Type toUIEventType;
 
 template<class T> class ThreadSafeQueue {
 public:
-	ThreadSafeQueue() : semFree(32), semUsed(0) { }
+	ThreadSafeQueue() : semFree(32), semUsed(0), valid(true) { }
 
 	void enqueue(const T &value) {
+		if(!valid) return;
+
 		semFree.acquire(1);
 		mutex.lock();
 		queue.enqueue(value);
@@ -40,6 +42,8 @@ public:
 	}
 
 	T dequeue() {
+		if(!valid) return NULL;
+
 		semUsed.acquire(1);
 		mutex.lock();
 		T val = queue.dequeue();
@@ -48,7 +52,24 @@ public:
 		return val;
 	}
 
+	void stop() {
+		// Stop new calls
+		valid = false;
+
+		// Make sure there is something to dequeue
+		mutex.lock();
+		queue.enqueue(NULL);
+		mutex.unlock();
+
+		// Allow waiting dequeue
+		semUsed.release(32);
+
+		// Allow waiting enqueue
+		semFree.release(32);
+	}
+
 protected:
+	bool valid;
 	QQueue<T> queue;
 	QSemaphore semFree;
 	QSemaphore semUsed;
@@ -261,7 +282,9 @@ Q_DECL_EXPORT int haskades_run(char *qml_path) {
 	// We complete the transaction started in the main application constructor and start the
 	// client event loop here. When loop is exited the Application deletes the scene which
 	// deletes all its children.
-	return bb::cascades::Application::exec();
+	int status = bb::cascades::Application::exec();
+	signalFromUIQ.stop();
+	return status;
 }
 
 #ifdef USE_SENSORS
