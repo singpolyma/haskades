@@ -107,6 +107,7 @@ public:
 		qmlRegisterType<bb::platform::Notification>("bb.platform", 1, 0, "Notification");
 		qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "NotificationDialog");
 #endif
+		qmlRegisterType<QTimer>("haskades.qtcore", 1, 0, "QTimer");
 	}
 
 	virtual void ready() {
