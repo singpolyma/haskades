@@ -10,6 +10,10 @@
 #include <bb/cascades/QmlDocument>
 #include <bb/cascades/AbstractPane>
 
+#ifdef USE_NETWORK
+#include <QtNetwork>
+#endif
+
 #ifdef USE_SENSORS
 #include <QtSensors/QAccelerometer>
 #endif
@@ -107,6 +111,7 @@ public:
 		qmlRegisterType<bb::platform::Notification>("bb.platform", 1, 0, "Notification");
 		qmlRegisterType<bb::platform::NotificationDialog>("bb.platform", 1, 0, "NotificationDialog");
 #endif
+		qmlRegisterType<QNetworkConfigurationManager>("haskades.qtnetwork", 1, 0, "QNetworkConfigurationManager");
 		qmlRegisterType<QTimer>("haskades.qtcore", 1, 0, "QTimer");
 	}
 
