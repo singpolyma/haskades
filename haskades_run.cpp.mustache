@@ -69,11 +69,11 @@ public:
 	}
 
 protected:
-	bool valid;
 	QQueue<T> queue;
+	QMutex mutex;
 	QSemaphore semFree;
 	QSemaphore semUsed;
-	QMutex mutex;
+	bool valid;
 };
 
 ThreadSafeQueue<SignalFromUI*> signalFromUIQ;
