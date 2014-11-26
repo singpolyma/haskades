@@ -12,7 +12,7 @@ module HaskadesBinding (
 
 #include "{{headerPath}}"
 
-import Control.Applicative (pure, (<*>))
+import Control.Applicative (pure, (<$>), (<*>))
 import Control.Monad (when, ap, join, forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Concurrent (forkIO)
@@ -56,11 +56,12 @@ emit ({{signame}} {{#sigargs}}{{siganame}} {{/sigargs}}) = liftIO (
 	)
 {{/toUI}}
 
-popSignalFromUI :: (MonadIO m) => m SignalFromUI
+popSignalFromUI :: (MonadIO m) => m (Maybe SignalFromUI)
 popSignalFromUI = liftIO (c_pop_SignalFromUI >>= peekFromUI)
 
-peekFromUI :: Ptr SignalFromUI -> IO SignalFromUI
-peekFromUI ptr = do
+peekFromUI :: Ptr SignalFromUI -> IO (Maybe SignalFromUI)
+peekFromUI ptr | ptr == nullPtr = return Nothing
+peekFromUI ptr = Just <$> do
 	tag <- #{peek struct SignalFromUI, tag} ptr
 	case (tag :: CInt) of
 {{#fromUI}}
@@ -73,7 +74,7 @@ peekFromUI ptr = do
 haskadesRun :: (MonadIO m) => String -> (SignalFromUI -> IO ()) -> m ()
 haskadesRun qmlPath handler = liftIO $ do
 
-	_ <- forkIO (forever $ popSignalFromUI >>= handler)
+	_ <- forkIO (forever $ popSignalFromUI >>= maybe (return ()) handler)
 
 	code <- ByteString.useAsCString (Text.encodeUtf8 $ Text.pack qmlPath) (\qmlPath ->
 			c_haskades_run qmlPath
