@@ -1,6 +1,7 @@
 #include <QtDebug>
 #include <QLocale>
 #include <QTranslator>
+#include <QDir>
 
 #include <QQueue>
 #include <QSemaphore>
@@ -177,6 +178,8 @@ public:
 #endif
 #endif
 
+	Q_PROPERTY(QString homePath READ getHomePath);
+
 signals:
 {{#toUI}}
 	void {{signame}}({{#sigargs}}{{^sigargfirst}}, {{/sigargfirst}}{{qtsigargtype}}{{/sigargs}});
@@ -196,6 +199,10 @@ protected:
 #ifdef USE_INVOCATIONS
 	bb::system::InvokeManager invokeManager;
 #endif
+
+	QString getHomePath() {
+		return QDir::homePath();
+	}
 };
 
 #ifdef USE_SENSORS
